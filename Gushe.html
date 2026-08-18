@@ -24,6 +24,10 @@
             margin-top: 0px; 
             cursor: pointer; 
             display: block; 
+			            /* FIX: Completely disable the mobile browser blue tap-highlight flash box */
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            -webkit-user-select: none; /* Stops text selection popups on hold */
+            user-select: none;
         }
         #controls { 
             margin-top: 15px; 
