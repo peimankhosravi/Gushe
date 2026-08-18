@@ -8,8 +8,8 @@
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            background-color: #ffffff; 
-            margin: 0; 
+            background-color: white; 
+            margin: 10; 
             padding: 0px;
             display: flex; 
             flex-direction: column;
@@ -27,8 +27,9 @@
             user-select: none;
             outline: none !important;
         }
+
         #canvas { 
-            background: White; 
+            background: white; 
             margin-top: 0px; 
             cursor: pointer; 
             display: block; 
@@ -38,7 +39,7 @@
             user-select: none;
         }
         #controls { 
-            margin-top: 15px; 
+            margin-top: 20px; 
             max-width: 900px; 
             width: 70%; 
             text-align: left; 
@@ -78,7 +79,7 @@
             height: 30px; 
 
             padding: 6px 10px; 
-            font-size: 15px; 
+            font-size: 12px; 
             background: #f9f9f9; 
             border: 1px solid #ccc; 
             border-radius: 4px; 
@@ -86,8 +87,8 @@
         }
         .btn-export { 
             width: 10%; 
-            padding: 6px 10px; 
-            font-size: 8px; 
+            padding: 0px 0px; 
+            font-size: 12px; 
             font-weight: bold; 
             background-color: #00cea6; 
             color: white; 
@@ -108,10 +109,10 @@
             display: inline-flex; 
             align-items: center; 
             justify-content: center; 
-            font-size: 8px; 
+            font-size: 12px; 
             font-weight: bold; 
             border-radius: 4px; 
-            padding: 6px 12px; 
+            padding: 0px 0px; 
             cursor: pointer; 
             height: 20px; 
             box-sizing: border-box; 
@@ -121,6 +122,7 @@
         .btn-file-load:hover { 
             background-color: #2d3748; 
         }
+
         #file-input { 
             display: none; 
         }
@@ -149,7 +151,7 @@
             padding: 10px 14px; 
             border-radius: 6px; 
             border: 1px solid #e2e8f0; 
-            margin-top: 30px;
+            margin-top: 10px;
             gap: 12px;
             width: fit-content;
         }
@@ -229,7 +231,7 @@
             </div>
         </div>
 
-    <canvas id="canvas" width="700" height="700"></canvas>
+    <canvas id="canvas" width="700" height="650"></canvas>
 
 
     <div id="controls">
@@ -266,8 +268,8 @@
             <div class="btn-container">
 
                 <button class="btn-export" id="export-scl-btn">Export</button>
-                <button class="btn-export" id="preview-scale-btn" style="background-color: #9b5de5;">Preview</button>
-                <label class="btn-file-load" for="file-input">Load Preset</label>
+                <button class="btn-export" id="preview-scale-btn" style="background-color: #9b5de5;">Play</button>
+                <label class="btn-file-load" for="file-input">Load</label>
 		<input type="file" id="file-input" accept=".txt, .TXT, text/plain">
 
 		<label class="toggle-container">
@@ -413,7 +415,7 @@
     const presetSelect = document.getElementById('preset-select');
     const fileInput = document.getElementById('file-input');
     const keyboardToggle = document.getElementById('keyboard-toggle');
-    const centerX = 350, centerY = 350, radius = 250;
+    const centerX = 350, centerY = 330, radius = 270;
     let nodeClickAreas = []; 
     let currentRotationOffset = 0; 
     let isDraggingScale = false;
