@@ -392,14 +392,13 @@
         osc.type = 'sine';
         osc.frequency.setValueAtTime(hz, audioCtx.currentTime);
 
+
     // FIX: Core lookahead timestamp injection prevents mobile browser timing dropouts
     const mobileHardwareTimeCushion = audioCtx.currentTime + 0.01;
 
     gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
     // Smoothly ramp volume relative to our safe hardware window anchor block
     gainNode.gain.linearRampToValueAtTime(0.2, mobileHardwareTimeCushion + 0.015);
-
-
         osc.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         osc.start();
@@ -417,9 +416,18 @@
                 requestAnimationFrame(updatePlot);
             }
             try {
+            try {
+                // FIX: Apply the same lookahead window cushion to prevent mobile speaker pops on note lift
+                const releaseAnchorTime = audioCtx.currentTime + 0.005;
                 const prevGain = voice.gainNode.gain;
+                
                 prevGain.setValueAtTime(prevGain.value, audioCtx.currentTime);
-                voice.gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
+                voice.gainNode.gain.linearRampToValueAtTime(0, releaseAnchorTime + 0.045);
+                
+                const targetOsc = voice.osc;
+                setTimeout(() => targetOsc.stop(), 65);
+            } catch(e) {}
+
                 const targetOsc = voice.osc;
                 
                 setTimeout(() => {
