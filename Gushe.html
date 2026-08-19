@@ -391,8 +391,15 @@
         const gainNode = audioCtx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(hz, audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.05);
+
+    // FIX: Core lookahead timestamp injection prevents mobile browser timing dropouts
+    const mobileHardwareTimeCushion = audioCtx.currentTime + 0.01;
+
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    // Smoothly ramp volume relative to our safe hardware window anchor block
+    gainNode.gain.linearRampToValueAtTime(0.2, mobileHardwareTimeCushion + 0.015);
+
+
         osc.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         osc.start();
