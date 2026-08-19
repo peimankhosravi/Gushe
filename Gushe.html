@@ -233,11 +233,7 @@
                 <div class="stepper-display-box" id="stepper-note-display">C (0¢)</div>
                 <button class="stepper-btn" id="stepper-next-btn" type="button">&gt;</button>
                 
-		<!-- 2. Integrated Visual Scale Step Player Box (Simplified Button Display) -->
-		<div style="display: flex; align-items: center; gap: 5px; margin: 0 0px; padding: 0 0px;">
-                <button class="stepper-btn" id="notehead-prev-btn" type="button">&lt;</button>
-                <div id="scale-step-text-display" style="background: #ffffff; border: 1px solid #cbd5e0; border-radius: 4px; width: 110px; height: 20px; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; font-weight: bold; color: #1a202c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;">C</div>
-                 <button class="stepper-btn" id="notehead-next-btn" type="button" >&gt;</button>
+
                 </div>
 
 
@@ -279,7 +275,7 @@
 
 
             <div class="btn-container">
-                <button class="btn-export" id="export-scl-btn">Write scl File</button>
+                <button class="btn-export" id="export-scl-btn">Export scl</button>
                 <label class="btn-file-load" for="file-input">Load Preset</label>
 		<input type="file" id="file-input" accept=".txt, .TXT, text/plain">
                 <!-- 3. Unified Media Play/Stop Toggle Control -->
@@ -1049,14 +1045,17 @@
         if (e.pointerType === 'touch') canvas.setPointerCapture(e.pointerId);
         
         const rect = canvas.getBoundingClientRect(); 
-        const mx = e.clientX - rect.left; 
-        const my = e.clientY - rect.top; 
+        
+        // FIX: Scale raw touch pixels to perfectly match your 700x650 internal canvas resolution
+        const mx = (e.clientX - rect.left) * (canvas.width / rect.width); 
+        const my = (e.clientY - rect.top) * (canvas.height / rect.height); 
+        
         let soundNodeTriggered = false;
         
         for (let area of nodeClickAreas) { 
             const dist = Math.hypot(mx - area.x, my - area.y); 
 
-             if (dist <= area.radius) { 
+            if (dist <= area.radius) { 
                 const noteInstance = masterNoteMatrix.find(n => n.name === area.name);
                 const slashPos = noteInstance.ratio.indexOf("/");
                 const num = Number(noteInstance.ratio.substring(0, slashPos));
@@ -1082,18 +1081,10 @@
                 
                 soundNodeTriggered = true; 
                 break; 
-            } 
-
-
-
-        }
-
-        if (!soundNodeTriggered && Math.hypot(mx - centerX, my - centerY) <= radius + 90) { 
-            isDraggingScale = true; 
-            initialDragMouseAngle = Math.atan2(my - centerY, mx - centerX); 
-            baseAngleAtDragStart = currentRotationOffset; 
+            }
         }
     }
+
 
     function handlePointerMove(e) { return; }
 
@@ -1403,94 +1394,6 @@
     stepperPrevBtn.addEventListener('click', () => updateStepperAlignment(-1));
     stepperNextBtn.addEventListener('click', () => updateStepperAlignment(1));
 
-    // === TABLET UNIVERSAL GRID STEP TEXT PLAYER CONTROLLER ===
-    const stepTextDisplay = document.getElementById('scale-step-text-display');
-    const stepPrevBtn = document.getElementById('notehead-prev-btn');
-    const stepNextBtn = document.getElementById('notehead-next-btn');
-
-    // Keep track of which explicit index of the 21 master grid notes we have targeted
-    let activeGridStepIndex = 0;
-    const staffTouchVoiceId = "notehead_staff_touch_voice";
-
-    function refreshActiveStepDisplay() {
-        if (!stepTextDisplay) return;
-
-        // Verify that your core 21-note matrix exists and contains active records
-        if (!masterNoteMatrix || masterNoteMatrix.length === 0) {
-            stepTextDisplay.textContent = "---";
-            return;
-        }
-
-        // Keep the pointer index bounded cleanly across the 21 master note slots
-        activeGridStepIndex = (activeGridStepIndex + masterNoteMatrix.length) % masterNoteMatrix.length;
-
-        // Pull the true background text string name label directly from the matrix
-        const targetedLabel = masterNoteMatrix[activeGridStepIndex].name;
-
-        // Print the pure note name directly into your top parameter text display box
-        stepTextDisplay.textContent = targetedLabel;
-    }
-
-    function playActiveStaffStep() {
-        if (!masterNoteMatrix || masterNoteMatrix.length === 0) return;
-
-        // Extract the target note instance from the master array
-        const noteInstance = masterNoteMatrix[activeGridStepIndex];
-        
-        // Use your core baseline parsing formula to calculate the absolute untransposed frequency
-        const slashPos = noteInstance.ratio.indexOf("/");
-        const num = Number(noteInstance.ratio.substring(0, slashPos));
-        const den = Number(noteInstance.ratio.substring(slashPos + 1));
-        const baseCentsValue = 1200.0 * Math.log2(num / den);
-        
-        // Generate the high-precision absolute reference pitch matching the static grid pin
-        const referenceHz = 261.63 * Math.pow(2.0, baseCentsValue / 1200.0);
-
-        // Trigger absolute high-precision audio output directly across the registers
-        // Using the note name directly alerts the drawing engine to highlight it on the wheel
-        // FIX: Match your canvas touch naming format exactly to bypass the rotation calculation inside startVoicePoly!
-        startVoicePoly("canvas_touch_stepper", referenceHz, "static_grid_node__" + noteInstance.name);
-    }
-
-    // Bind navigation buttons to scroll through the 21 master grid notes sequentially
-    if (stepPrevBtn) {
-        stepPrevBtn.addEventListener('click', () => {
-            activeGridStepIndex--;
-            refreshActiveStepDisplay();
-            // If currently touching the glass screen, update pitch height smoothly live
-            if (activeVoicesMap.has(staffTouchVoiceId)) playActiveStaffStep();
-        });
-    }
-
-    if (stepNextBtn) {
-        stepNextBtn.addEventListener('click', () => {
-            activeGridStepIndex++;
-            refreshActiveStepDisplay();
-            if (activeVoicesMap.has(staffTouchVoiceId)) playActiveStaffStep();
-        });
-    }
-
-    // Bind the step parameter display window directly to unified pointer gestures
-    if (stepTextDisplay) {
-        stepTextDisplay.addEventListener('pointerdown', (e) => {
-            e.preventDefault();
-            if (e.pointerType === 'touch') stepTextDisplay.setPointerCapture(e.pointerId);
-            playActiveStaffStep();
-        });
-
-        stepTextDisplay.addEventListener('pointerup', (e) => {
-            if (e.pointerType === 'touch') {
-                try { stepTextDisplay.releasePointerCapture(e.pointerId); } catch(err) {}
-            }
-        // Change your stop line from stopVoicePoly(staffTouchVoiceId); to:
-        stopVoicePoly("canvas_touch_stepper");
-        });
-
-        stepTextDisplay.addEventListener('pointerleave', () => {
-        // Change your stop line from stopVoicePoly(staffTouchVoiceId); to:
-        stopVoicePoly("canvas_touch_stepper");
-        });
-    }
 
 
 	updatePlot();
