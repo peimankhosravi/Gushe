@@ -77,7 +77,6 @@
         input[type="text"], select { 
             width: 100%; 
             height: 30px; 
-
             padding: 6px 6px; 
             font-size: 14px; 
             background: #f9f9f9; 
@@ -150,9 +149,9 @@
             background: #f7fafc; 
             padding: 6px 6px; 
             border-radius: 6px; 
-            border: 1px solid #e2e8f0; 
+            border: 3px solid #e2e8f0; 
             margin-top: 30px;
-            gap: 12px;
+            gap: 5px;
             width: fit-content;
         }
 
@@ -162,7 +161,7 @@
             border-radius: 4px;
             width: 10px;
             height: 20px;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             color: #2d3748;
             cursor: pointer;
@@ -173,15 +172,17 @@
             touch-action: manipulation; /* Removes mobile touch tap delays */
             transition: all 0.1s ease;
         }
+
         .stepper-btn:active {
             background: #edf2f7;
             border-color: #a0aec0;
         }
+
         .stepper-display-box {
             background: #ffffff;
             border: 1px solid #cbd5e0;
             border-radius: 4px;
-            min-width: 120px;
+            min-width: 110px;
             height: 20px;
             display: flex;
             align-items: center;
@@ -232,11 +233,11 @@
                 <div class="stepper-display-box" id="stepper-note-display">C (0¢)</div>
                 <button class="stepper-btn" id="stepper-next-btn" type="button">&gt;</button>
                 
-                <!-- 2. Integrated Visual Scale Step Player Box (Simplified Text Display) -->
-                <div style="display: flex; align-items: center; gap: 5px; margin: 0 10px; border-left: 2px solid #cbd5e0; border-right: 2px solid #cbd5e0; padding: 0 15px;">
-                    <button class="stepper-btn" id="notehead-prev-btn" type="button">&lt;</button>
-                    <div id="scale-step-text-display" style="background: #ffffff; border: 1px solid #cbd5e0; border-radius: 4px; width: 120px; height: 20px; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; font-weight: bold; color: #1a202c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;">C</div>
-                    <button class="stepper-btn" id="notehead-next-btn" type="button" >&gt;</button>
+		<!-- 2. Integrated Visual Scale Step Player Box (Simplified Button Display) -->
+		<div style="display: flex; align-items: center; gap: 5px; margin: 0 0px; padding: 0 0px;">
+                <button class="stepper-btn" id="notehead-prev-btn" type="button">&lt;</button>
+                <div id="scale-step-text-display" style="background: #ffffff; border: 1px solid #cbd5e0; border-radius: 4px; width: 110px; height: 20px; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; font-weight: bold; color: #1a202c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;">C</div>
+                 <button class="stepper-btn" id="notehead-next-btn" type="button" >&gt;</button>
                 </div>
 
 
