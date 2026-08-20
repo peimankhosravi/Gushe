@@ -398,45 +398,60 @@
             requestAnimationFrame(updatePlot);
         }
     }
+
+
     function stopVoicePoly(voiceId) {
         if (activeVoicesMap.has(voiceId)) {
             const voice = activeVoicesMap.get(voiceId);
+            
             if (voice.noteName) {
                 currentlyPlayingNoteNames.delete(voice.noteName);
                 requestAnimationFrame(updatePlot);
             }
+            
             try {
                 const prevGain = voice.gainNode.gain;
-                prevGain.setValueAtTime(prevGain.value, audioCtx.currentTime);
-                voice.gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
                 const targetOsc = voice.osc;
+                const now = audioCtx.currentTime;
                 
-                setTimeout(() => {
-                    targetOsc.stop();
-                    
-                    // FIX: If the preview sequence is running, look inside our active maps
-                    // the moment the oscillator finishes its 60ms fade-out cushion.
-                    if (typeof isScalePreviewRunning !== 'undefined' && isScalePreviewRunning) {
-                        // Gather any remaining preview voices (where voiceId is 0)
-                        const activePreviewVoices = Array.from(activeVoicesMap.keys()).filter(id => id === 0 || id === "0");
-                        
-                        // If no more scale preview steps are active in the audio registers, we have returned home!
-                        if (activePreviewVoices.length === 0) {
-                            isScalePreviewRunning = false;
-                            const toggleBtn = document.getElementById('preview-scale-btn');
-                            if (toggleBtn) {
-                                toggleBtn.textContent = "Play";
-                                toggleBtn.style.backgroundColor = "";
-                                toggleBtn.style.borderColor = "";
-                                requestAnimationFrame(updatePlot);
-                            }
+                // 1. Instantly clear out any active attack curves running on the hardware chip
+                prevGain.cancelScheduledValues(now);
+                
+                // 2. Lock the current volume state as the explicit anchor starting point for the release fade
+                prevGain.setValueAtTime(prevGain.value, now);
+                
+                // 3. Schedule the volume envelope to ramp smoothly down to zero over 50ms (0.05s) on the audio chip
+                prevGain.linearRampToValueAtTime(0, now + 0.05);
+                
+                // 4. FIX: Redesign note lifecycle tracking to pull the plug using the native hardware clock timeline.
+                // This completely bypasses setTimeout, stopping the oscillator the exact millisecond the volume hits zero.
+                targetOsc.stop(now + 0.05);
+                
+            } catch(e) {}
+            
+            // 5. ISOLATED FALLBACK: This timer ONLY handles the interface text buttons style hooks 
+            // for the scale preview loop. It no longer controls or touches your real physical audio voice lifespans!
+            setTimeout(() => {
+                if (typeof isScalePreviewRunning !== 'undefined' && isScalePreviewRunning) {
+                    const activePreviewVoices = Array.from(activeVoicesMap.keys()).filter(id => id === 0 || id === "0");
+                    if (activePreviewVoices.length === 0) {
+                        isScalePreviewRunning = false;
+                        const toggleBtn = document.getElementById('preview-scale-btn');
+                        if (toggleBtn) {
+                            toggleBtn.textContent = "Play";
+                            toggleBtn.style.backgroundColor = "";
+                            toggleBtn.style.borderColor = "";
+                            requestAnimationFrame(updatePlot);
                         }
                     }
-                }, 60);
-            } catch(e) {}
+                }
+            }, 60);
+
             activeVoicesMap.delete(voiceId);
         }
     }
+
+
 
     function stopAllVoices() {
         for (const key of activeVoicesMap.keys()) {
