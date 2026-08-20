@@ -941,66 +941,54 @@
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
 
+
         const noteDurationMs = 450; 
-        const durationSec = noteDurationMs / 1000.0;
-        
-        // 1. Establish an absolute starting anchor point on the rock-solid hardware audio clock
-        // Adding a 100ms cushion gives mobile devices plenty of time to pre-buffer the sequence data
-        let hardwareTimePointer = audioCtx.currentTime + 0.10;
+        let noteDelayOffset = 0;
 
         finalMelodyCentsPath.forEach((playCents, idx) => {
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // Generate a distinct note-specific identifier for each step in the melody sequence
-            const uniqueStepVoiceId = "preview_scale_" + idx;
-
-            // 2. Schedule the audio nodes directly on the hardware timeline
-            // This runs in a single frame, completely bypassing all setTimeout rhythm drift!
-            const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(frequencyHz, hardwareTimePointer);
-
-            // Hardlock pristine hardware envelope shapes natively to the audio context clock
-            gainNode.gain.setValueAtTime(0, hardwareTimePointer);
-            gainNode.gain.linearRampToValueAtTime(0.25, hardwareTimePointer + 0.05); // Attack
-            gainNode.gain.setValueAtTime(0.25, hardwareTimePointer + durationSec - 0.05);
-            gainNode.gain.linearRampToValueAtTime(0, hardwareTimePointer + durationSec); // Release
-
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            osc.start(hardwareTimePointer);
-            osc.stop(hardwareTimePointer + durationSec);
-
-            // 3. Save the nodes into your activeVoicesMap using our schedule-safe unique step key
-            activeVoicesMap.set(uniqueStepVoiceId, { osc: osc, gainNode: gainNode, noteName: currentNoteName });
-
-            // 4. Symmetrical Visual Thread: Handles circle rendering flashes to match the audio clock
-            const delayToVisualFlashMs = Math.max(0, (hardwareTimePointer - audioCtx.currentTime) * 1000);
-            
-            setTimeout(() => {
-                if (isScalePreviewRunning && currentNoteName) {
-                    currentlyPlayingNoteNames.add(currentNoteName);
-                    requestAnimationFrame(updatePlot);
-                    
-                    setTimeout(() => {
-                        currentlyPlayingNoteNames.delete(currentNoteName);
-                        
-                        // Clean up this specific voice record from the map as it finishes naturally
-                        activeVoicesMap.delete(uniqueStepVoiceId);
-                        
-                        requestAnimationFrame(updatePlot);
-                    }, noteDurationMs - 50);
+            // 1. Note On Thread: Standard timeout schedules the entry point so your Stop button can clear it!
+            setTimeout(() => { 
+                if (!isScalePreviewRunning) return;
+                
+                // Fire your native voice engine safely using your original voice ID 0
+                startVoicePoly(0, frequencyHz, currentNoteName); 
+                
+                // FIX: Hardlock the volume envelope life cycle directly onto the hardware sound card timeline.
+                // This shields the note duration from phone lag, stopping notes from sounding cut off or early.
+                if (audioCtx) {
+                    try {
+                        const voice = activeVoicesMap.get(0) || activeVoicesMap.get("0");
+                        if (voice) {
+                            const now = audioCtx.currentTime;
+                            const noteLifespanSec = (noteDurationMs - 50) / 1000.0;
+                            
+                            // Native hardware envelopes complete their slopes flawlessly on mobile screens
+                            voice.gainNode.gain.cancelScheduledValues(now);
+                            voice.gainNode.gain.setValueAtTime(0, now);
+                            voice.gainNode.gain.linearRampToValueAtTime(0.25, now + 0.05); // Fixed Attack
+                            voice.gainNode.gain.setValueAtTime(0.25, now + noteLifespanSec - 0.05);
+                            voice.gainNode.gain.linearRampToValueAtTime(0, now + noteLifespanSec); // Fixed Release
+                            
+                            // Pull the plug precisely when the volume envelope hits absolute zero
+                            voice.osc.stop(now + noteLifespanSec);
+                        }
+                    } catch(err) {}
                 }
-            }, delayToVisualFlashMs);
+            }, noteDelayOffset);
 
-            // Advance the timeline anchor cleanly by the precise note duration step
-            hardwareTimePointer += durationSec;
+            // 2. Note Off Thread: Parallel layout ensures your native button code resets automatically
+            setTimeout(() => { 
+                if (isScalePreviewRunning) stopVoicePoly(0); 
+            }, noteDelayOffset + (noteDurationMs - 50));
+
+            // Advance the timeline spacing cleanly for the next note slot
+            noteDelayOffset += noteDurationMs;
         });
     } // <--- This closing bracket ends the playScalePreview function
+
 
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
