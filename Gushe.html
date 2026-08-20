@@ -33,10 +33,12 @@
             margin-top: 10px; 
             cursor: pointer; 
             display: block; 
-			            /* FIX: Completely disable the mobile browser blue tap-highlight flash box */
+				/* FIX: Completely disable the mobile browser blue tap-highlight flash box */
             -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
             -webkit-user-select: none; /* Stops text selection popups on hold */
             user-select: none;
+            touch-action: none;
+
         }
         #controls { 
             margin-top: 0px; 
@@ -376,7 +378,6 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
     }
-
     function startVoicePoly(voiceId, hz, noteName = null) {
         initAudio();
         stopVoicePoly(voiceId);
@@ -387,57 +388,38 @@
         const osc = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
         osc.type = 'sine';
-        
-        const now = audioCtx.currentTime;
-        osc.frequency.setValueAtTime(hz, now);
-        
-        // Start the gain at absolute 0
-        gainNode.gain.setValueAtTime(0, now);
-        
-        // FIX: Use setTargetAtTime for a flawless exponential curve on mobile screens.
-        // 0.25 = target volume, now = start time, 0.015 = time constant (adjusts attack speed)
-        gainNode.gain.setTargetAtTime(0.25, now, 0.015);
-        
+        osc.frequency.setValueAtTime(hz, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.05);
         osc.connect(gainNode);
         gainNode.connect(audioCtx.destination);
-        osc.start(now);
-        
+        osc.start();
         activeVoicesMap.set(voiceId, { osc: osc, gainNode: gainNode, noteName: noteName });
         if (noteName) {
             currentlyPlayingNoteNames.add(noteName);
             requestAnimationFrame(updatePlot);
         }
     }
-
     function stopVoicePoly(voiceId) {
         if (activeVoicesMap.has(voiceId)) {
             const voice = activeVoicesMap.get(voiceId);
-            
             if (voice.noteName) {
                 currentlyPlayingNoteNames.delete(voice.noteName);
                 requestAnimationFrame(updatePlot);
             }
-            
             try {
-                const now = audioCtx.currentTime;
+                // FIX: Grab the current real gain value instantly, lock it to the current time,
+                // and give the mobile hardware a 15ms head-start to render the release ramp cleanly
+                const currentGainVal = voice.gainNode.gain.value;
+                const mobileSafeReleaseTime = audioCtx.currentTime + 0.015;
                 
-                // 1. Force the gain node to lock its current volume at this exact millisecond
-                voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, now);
+                voice.gainNode.gain.setValueAtTime(currentGainVal, audioCtx.currentTime);
+                // Slide the volume smoothly down to zero over your preferred envelope cushion window (40ms)
+                voice.gainNode.gain.linearRampToValueAtTime(0, mobileSafeReleaseTime + 0.04);
                 
-                // 2. FIX: Use setTargetAtTime to generate a smooth exponential fade-out on mobile screens
-                // 0 = target volume, now = start time, 0.015 = time constant (controls the fade-out speed)
-                voice.gainNode.gain.setTargetAtTime(0, now, 0.015);
-                
-                // 3. Let the oscillator node play out for a brief window to complete the fade before stopping it completely
                 const targetOsc = voice.osc;
-                setTimeout(() => {
-                    try {
-                        targetOsc.stop();
-                    } catch(e) {}
-                }, 80);
-                
+                setTimeout(() => targetOsc.stop(), 70);
             } catch(e) {}
-            
             activeVoicesMap.delete(voiceId);
         }
     }
@@ -1353,7 +1335,8 @@
 
 	presetSelect.addEventListener('change', () => { textEntry.value = presetSelect.value; updatePlot(); }); 
         canvas.addEventListener('pointerdown', handlePointerDown); 
- //       canvas.addEventListener('dblclick', handleDoubleClick); 
+
+
         window.addEventListener('pointermove', handlePointerMove); 
         window.addEventListener('pointerup', handlePointerUp);
         window.addEventListener('pointercancel', handlePointerUp); // Safe boundary drop handling
