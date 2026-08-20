@@ -949,15 +949,11 @@
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // 1. Note On Thread: Standard timeout schedules the entry point so your Stop button can clear it!
+            // 1. Note On Thread: Handles note attack natively via your voice system
             setTimeout(() => { 
                 if (!isScalePreviewRunning) return;
-                
-                // Fire your native voice engine safely using your original voice ID 0
                 startVoicePoly(0, frequencyHz, currentNoteName); 
                 
-                // FIX: Hardlock the volume envelope life cycle directly onto the hardware sound card timeline.
-                // This shields the note duration from phone lag, stopping notes from sounding cut off or early.
                 if (audioCtx) {
                     try {
                         const voice = activeVoicesMap.get(0) || activeVoicesMap.get("0");
@@ -965,28 +961,44 @@
                             const now = audioCtx.currentTime;
                             const noteLifespanSec = (noteDurationMs - 50) / 1000.0;
                             
-                            // Native hardware envelopes complete their slopes flawlessly on mobile screens
                             voice.gainNode.gain.cancelScheduledValues(now);
                             voice.gainNode.gain.setValueAtTime(0, now);
-                            voice.gainNode.gain.linearRampToValueAtTime(0.25, now + 0.05); // Fixed Attack
+                            voice.gainNode.gain.linearRampToValueAtTime(0.25, now + 0.05); 
                             voice.gainNode.gain.setValueAtTime(0.25, now + noteLifespanSec - 0.05);
-                            voice.gainNode.gain.linearRampToValueAtTime(0, now + noteLifespanSec); // Fixed Release
+                            voice.gainNode.gain.linearRampToValueAtTime(0, now + noteLifespanSec); 
                             
-                            // Pull the plug precisely when the volume envelope hits absolute zero
                             voice.osc.stop(now + noteLifespanSec);
                         }
                     } catch(err) {}
                 }
             }, noteDelayOffset);
 
-            // 2. Note Off Thread: Parallel layout ensures your native button code resets automatically
+            // 2. Note Off Thread: Handles release updates and resets button at the absolute end of the array path
             setTimeout(() => { 
-                if (isScalePreviewRunning) stopVoicePoly(0); 
+                if (!isScalePreviewRunning) return;
+
+                // FIX: Check if this is the final note in the path sequence
+                const isFinalSequenceNote = (idx === finalMelodyCentsPath.length - 1);
+
+                if (isFinalSequenceNote) {
+                    // Cleanly conclude the melody state and reset the interface button back to green "Play"
+                    isScalePreviewRunning = false;
+                    if (previewToggleBtn) {
+                        previewToggleBtn.textContent = "Play";
+                        previewToggleBtn.style.backgroundColor = ""; 
+                        previewToggleBtn.style.borderColor = "";
+                    }
+                    stopVoicePoly(0);
+                } else {
+                    // Standard intermediate note cutoff tracking
+                    stopVoicePoly(0); 
+                }
             }, noteDelayOffset + (noteDurationMs - 50));
 
             // Advance the timeline spacing cleanly for the next note slot
             noteDelayOffset += noteDurationMs;
         });
+
     } // <--- This closing bracket ends the playScalePreview function
 
 
