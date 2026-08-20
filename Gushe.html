@@ -969,43 +969,80 @@
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
         
-        // === FIX: RECURSIVE HARDWARE-SYNCHRONIZED STEP RUNNER ===
+        // === FIX: PURE HARDWARE LOOKAHEAD AUDIO SCHEDULER ===
         const noteDurationMs = 450;
+        const noteDurationSec = noteDurationMs / 1000.0;
+        
         let currentStepIndex = 0;
+        // Establish our initial hardware clock timeline starting anchor
+        let nextNoteTime = audioCtx.currentTime + 0.05;
+        const lookaheadWindowSec = 0.1; // Queue notes 100ms into the future
 
-        function runSequencerStep() {
-            // Boundary Protection: Stop if we reach the end of the melody path or if the user hit Stop
-            if (!isScalePreviewRunning || currentStepIndex >= finalMelodyCentsPath.length) {
-                return;
+        function schedulerTimelineLoop() {
+            // If the user pressed the Stop button, halt the scheduler thread instantly
+            if (!isScalePreviewRunning) return;
+
+            // While there are notes left and they fall within our lookahead hardware window
+            while (nextNoteTime < audioCtx.currentTime + lookaheadWindowSec && currentStepIndex < finalMelodyCentsPath.length) {
+                
+                const playCents = finalMelodyCentsPath[currentStepIndex];
+                const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
+                const currentNoteName = finalNotesPath[currentStepIndex];
+
+                // 1. Build and schedule the audio nodes directly on the hardware timeline
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(frequencyHz, nextNoteTime);
+
+                // Lock pristine hardware envelope shapes (50ms attack, 50ms release)
+                gainNode.gain.setValueAtTime(0, nextNoteTime);
+                gainNode.gain.linearRampToValueAtTime(0.25, nextNoteTime + 0.05);
+                gainNode.gain.setValueAtTime(0.25, nextNoteTime + noteDurationSec - 0.05);
+                gainNode.gain.linearRampToValueAtTime(0, nextNoteTime + noteDurationSec);
+
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                // Schedule rock-solid execution boundaries directly on the audio chip
+                osc.start(nextNoteTime);
+                osc.stop(nextNoteTime + noteDurationSec);
+
+                // 2. Save references to voice ID 0 so your existing Stop button can clear it instantly
+                activeVoicesMap.set(0, { osc: osc, gainNode: gainNode, noteName: currentNoteName });
+                activeVoicesMap.set("0", { osc: osc, gainNode: gainNode, noteName: currentNoteName });
+
+                // 3. Symmetrical UI Syncer: Coordinates the yellow canvas halo flashes to match the audio clock
+                const delayToVisualFlashMs = Math.max(0, (nextNoteTime - audioCtx.currentTime) * 1000);
+                
+                setTimeout(() => {
+                    if (isScalePreviewRunning && currentNoteName) {
+                        currentlyPlayingNoteNames.add(currentNoteName);
+                        requestAnimationFrame(updatePlot);
+                        
+                        setTimeout(() => {
+                            currentlyPlayingNoteNames.delete(currentNoteName);
+                            requestAnimationFrame(updatePlot);
+                        }, noteDurationMs - 50);
+                    }
+                }, delayToVisualFlashMs);
+
+                // Advance our hardware timeline pointer cleanly to the next note slot position
+                nextNoteTime += noteDurationSec;
+                currentStepIndex++;
             }
 
-            const playCents = finalMelodyCentsPath[currentStepIndex];
-            const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
-            const currentNoteName = finalNotesPath[currentStepIndex];
-
-            // 1. Fire Note On: Uses your native engine to keep your circle graphics 100% active
-            startVoicePoly(0, frequencyHz, currentNoteName);
-
-            // 2. Schedule Note Off: Flat timeout ensures envelopes complete their fades properly
-            setTimeout(() => {
-                // Only turn off if the user hasn't terminated the preview engine mid-note
-                if (isScalePreviewRunning) stopVoicePoly(0);
-            }, noteDurationMs - 50);
-
-            // Move pointer forward to the next note slot
-            currentStepIndex++;
-
-            // 3. FIX: Perfect Even Spacing. Calculate the exact delay until the next note runs,
-            // completely neutralizing any mobile browser thread jitter or pacing drops!
+            // If there are still notes left in the sequence, check the timeline again in 25ms
             if (currentStepIndex < finalMelodyCentsPath.length) {
-                setTimeout(runSequencerStep, noteDurationMs);
+                setTimeout(schedulerTimelineLoop, 25);
             }
         }
 
-        // Initialize the first step of the chain instantly
-        // FIX: Introduce a 150ms buffer to let the mobile audio hardware wake up before the first note fires!
-        setTimeout(runSequencerStep, 150);
-    }
+        // Initialize the lookahead sequencer engine thread instantly
+        schedulerTimelineLoop();
+    } // <--- This closing bracket ends the playScalePreview function
+
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
     const latchedKeyboardKeys = new Set();
