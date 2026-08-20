@@ -948,49 +948,31 @@
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // One singular timeout per step prevents mobile timer compression and jitter
+            // 1. Note On: Uses your original, timing-pragmatic flat structure
+            setTimeout(() => { 
+                if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
+            }, noteDelayOffset);
+
+            // 2. Note Off & Button State Handle
             setTimeout(() => { 
                 if (!isScalePreviewRunning) return;
-                
-                // 1. Fire your native voice engine safely using your original voice ID 0
-                startVoicePoly(0, frequencyHz, currentNoteName); 
-                
-                // 2. Schedule the volume envelope release directly on the hardware sound card timeline
-                if (audioCtx) {
-                    try {
-                        const voice = activeVoicesMap.get(0) || activeVoicesMap.get("0");
-                        if (voice) {
-                            const now = audioCtx.currentTime;
-                            const noteLifespanSec = (noteDurationMs - 50) / 1000.0;
-                            
-                            voice.gainNode.gain.cancelScheduledValues(now);
-                            voice.gainNode.gain.setValueAtTime(0, now);
-                            voice.gainNode.gain.linearRampToValueAtTime(0.25, now + 0.05); 
-                            voice.gainNode.gain.setValueAtTime(0.25, now + noteLifespanSec - 0.05);
-                            voice.gainNode.gain.linearRampToValueAtTime(0, now + noteLifespanSec); 
-                            
-                            voice.osc.stop(now + noteLifespanSec);
-                        }
-                    } catch(err) {}
-                }
 
-                // 3. FIX: Hardlock an absolute interface reset trigger if this is the final note in the melody path
-                const isFinalSequenceNote = (idx === finalMelodyCentsPath.length - 1);
-                if (isFinalSequenceNote) {
-                    // Match the visual text flip exactly to when the final audio note completes its fade
-                    setTimeout(() => {
-                        if (isScalePreviewRunning) {
-                            isScalePreviewRunning = false;
-                            if (previewToggleBtn) {
-                                previewToggleBtn.textContent = "Play";
-                                previewToggleBtn.style.backgroundColor = ""; 
-                                previewToggleBtn.style.borderColor = "";
-                            }
-                            stopVoicePoly(0);
-                        }
-                    }, noteDurationMs - 50);
+                // Stop the active voice node cleanly
+                stopVoicePoly(0); 
+
+                // FIX: Redesigned checking algorithm built right into the sequencer loop.
+                // The exact frame the final index is reached, it returns a direct handle to update the button!
+                const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
+                if (isFinalSequenceStep) {
+                    isScalePreviewRunning = false;
+                    if (previewToggleBtn) {
+                        previewToggleBtn.textContent = "Play";
+                        previewToggleBtn.style.backgroundColor = ""; 
+                        previewToggleBtn.style.borderColor = "";
+                    }
+                    requestAnimationFrame(updatePlot);
                 }
-            }, noteDelayOffset);
+            }, noteDelayOffset + (noteDurationMs - 50));
 
             // Advance the timeline spacing cleanly for the next note slot
             noteDelayOffset += noteDurationMs;
