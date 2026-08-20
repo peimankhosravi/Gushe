@@ -275,9 +275,11 @@
                 <button class="btn-export" id="export-scl-btn">Export scl</button>
                 <label class="btn-file-load" for="file-input">Load Preset</label>
 		<input type="file" id="file-input" accept=".txt, .TXT, text/plain">
-                <!-- 3. Unified Media Play/Stop Toggle Control -->
-                <button class="btn-file-load" id="preview-scale-btn" style="min-width: 80px; transition: all 0.1s ease;">Play</button>
-                
+ 
+		<!-- === Replace your old single play button with these two dedicated actions === -->
+		<button class="btn-file-load" id="play-scale-btn" style="min-width: 60px; background-color: #00cea6; color: white;">Play</button>
+		<button class="btn-file-load" id="stop-scale-btn" style="min-width: 60px; background-color: #ff4d4d; color: white; margin-left: 5px;">Stop</button>
+
 		<label class="toggle-container">
                 <input type="checkbox" id="keyboard-toggle" checked>
                 Keys 1-0
@@ -950,36 +952,20 @@
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // 1. Note On Thread: Standard timeout trigger ensures your Stop button clears it perfectly
+            // 1. Note On Thread: Perfect original timing
             setTimeout(() => { 
                 if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
             }, noteDelayOffset);
 
-            // 2. Note Off & Highlight Off Thread
+            // 2. Note Off Thread: Pure audio termination with zero layout interference
             setTimeout(() => { 
-                if (!isScalePreviewRunning) return;
-
-                // Fire your file's native note-off routine cleanly
-                stopVoicePoly(0); 
-
-                // FIX: Check if this is the absolute final note in the path sequence array.
-                // If it is, toggle the button text back to "Play" seamlessly alongside the highlight thread!
-                const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
-                if (isFinalSequenceStep) {
-                    isScalePreviewRunning = false;
-                    if (previewScaleBtn) {
-                        previewScaleBtn.textContent = "Play";
-                        previewScaleBtn.style.backgroundColor = ""; 
-                        previewScaleBtn.style.borderColor = "";
-                    }
-                    requestAnimationFrame(updatePlot);
-                }
+                if (isScalePreviewRunning) stopVoicePoly(0); 
             }, noteDelayOffset + (noteDurationMs - 50));
 
             // Advance the timeline spacing cleanly for the next note slot position
             noteDelayOffset += noteDurationMs;
         });
-    }
+    } // <--- Closing bracket of playScalePreview function
 
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
@@ -1351,50 +1337,44 @@
         stopAllVoices();
     }
 
-    // === UNIFIED PLAY / STOP MULTI-TOGGLE CONTROLLER ===
-    const previewToggleBtn = document.getElementById('preview-scale-btn');
+    // === SEPARATE PREVIEW ACTION CONTROLLERS ===
     let isScalePreviewRunning = false;
+    const playScaleBtn = document.getElementById('play-scale-btn');
+    const stopScaleBtn = document.getElementById('stop-scale-btn');
 
-    if (previewToggleBtn) {
-        previewToggleBtn.addEventListener('click', () => {
-            if (isScalePreviewRunning) {
-                // ACTION: EMERGENCY AUDIO STOP COMMAND
-                isScalePreviewRunning = false;
-                
-                // Explicitly silence the visual notehead staff voice node
-                stopVoicePoly("notehead_staff_touch_voice");
-                
-                // Terminate global voice registers and active audio mapping arrays
-                if (typeof clearAllHeldNotes === 'function') {
-                    clearAllHeldNotes();
-                } else if (typeof stopAllVoices === 'function') {
-                    stopAllVoices();
-                }
-                
-                // Clear any running browser timeouts to freeze the melody loop instantly
-                let highestTimeoutId = setTimeout(() => {}, 0);
-                for (let i = highestTimeoutId; i >= 0; i--) {
-                    clearTimeout(i);
-                }
-
-                // Reset button appearance back to the standard green playable layout
-                previewToggleBtn.textContent = "Play";
-                previewToggleBtn.style.backgroundColor = ""; 
-                previewToggleBtn.style.borderColor = "";
-                
-                if (typeof updatePlot === 'function') updatePlot();
-            } else {
-                // ACTION: START SCALE PLAYBACK LOOP
+    // 1. Dedicated Play Handler
+    if (playScaleBtn) {
+        playScaleBtn.addEventListener('click', () => {
+            if (!isScalePreviewRunning) {
                 isScalePreviewRunning = true;
-                previewToggleBtn.textContent = "Stop";
-                previewToggleBtn.style.backgroundColor = "#ff4d4d"; // Switch to alert red layout
-                previewToggleBtn.style.borderColor = "#ff3333";
-
-                // Execute your core sequential melody preview routine
-                if (typeof playScalePreview === 'function') {
-                    playScalePreview();
-                }
+                playScalePreview();
             }
+        });
+    }
+
+    // 2. Dedicated Stop Handler
+    if (stopScaleBtn) {
+        stopScaleBtn.addEventListener('click', () => {
+            isScalePreviewRunning = false;
+            
+            // Clear out active melody timeouts instantly
+            let highestTimeoutId = setTimeout(() => {}, 0);
+            for (let i = highestTimeoutId; i >= 0; i--) {
+                clearTimeout(i);
+            }
+
+            // Wipe active registries and canvas visual halos
+            currentlyPlayingNoteNames.clear();
+            stopVoicePoly("notehead_staff_touch_voice");
+            
+            if (typeof clearAllHeldNotes === 'function') {
+                clearAllHeldNotes();
+            } else if (typeof stopAllVoices === 'function') {
+                stopAllVoices();
+            }
+            
+            stopVoicePoly(0); // Instantly terminate active preview sound
+            if (typeof updatePlot === 'function') updatePlot();
         });
     }
 
