@@ -597,15 +597,15 @@
         masterNoteMatrix.forEach((node) => {
             const angle = (-90 + (node.calculatedCents / 1200.0) * 360) * Math.PI / 180.0;
             staticCoords[node.name] = { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) };
-            let labelRadius = radius + 40;
+            let labelRadius = radius + 32;
             if (node.name === "F sharp" || node.name === "F sori") {
-                labelRadius = radius + 40;
+                labelRadius = radius + 32;
             } else if (node.name === "C koron" || node.name === "C sori") {
                 labelRadius = radius + 30;
             } else if (node.name === "G" || node.name === "G koron" || node.name === "F" || node.name === "G flat") {
-                labelRadius = radius + 30; 
+                labelRadius = radius + 20; 
             } else if (node.name === "C" || node.name === "D flat" || node.name === "B" || node.name === "B koron" || node.name === "D" || node.name === "D koron") {
-                labelRadius = radius + 30;
+                labelRadius = radius + 22;
             }
             labelCoords[node.name] = { x: centerX + labelRadius * Math.cos(angle), y: centerY + labelRadius * Math.sin(angle) };
         });
@@ -742,7 +742,7 @@
             } else if (node.name.includes('flat')) {
                 elementStyleColor = 'purple';
             }
-            ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, 2 * Math.PI); ctx.fillStyle = elementStyleColor; ctx.fill();
+            ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, 2 * Math.PI); ctx.fillStyle = elementStyleColor; ctx.fill();
             ctx.fillStyle = elementStyleColor; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(node.txtLine1, lblPt.x, lblPt.y - 5); 
             ctx.fillText(node.txtLine2, lblPt.x, lblPt.y + 5); 
