@@ -948,7 +948,7 @@
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // FIX: One singular timeout per step prevents mobile timer compression and jitter
+            // One singular timeout per step prevents mobile timer compression and jitter
             setTimeout(() => { 
                 if (!isScalePreviewRunning) return;
                 
@@ -974,11 +974,20 @@
                     } catch(err) {}
                 }
 
-                // 3. FIX: Only trigger a software note-off command if this is the final note in the path
+                // 3. FIX: Hardlock an absolute interface reset trigger if this is the final note in the melody path
                 const isFinalSequenceNote = (idx === finalMelodyCentsPath.length - 1);
                 if (isFinalSequenceNote) {
+                    // Match the visual text flip exactly to when the final audio note completes its fade
                     setTimeout(() => {
-                        if (isScalePreviewRunning) stopVoicePoly(0);
+                        if (isScalePreviewRunning) {
+                            isScalePreviewRunning = false;
+                            if (previewToggleBtn) {
+                                previewToggleBtn.textContent = "Play";
+                                previewToggleBtn.style.backgroundColor = ""; 
+                                previewToggleBtn.style.borderColor = "";
+                            }
+                            stopVoicePoly(0);
+                        }
                     }, noteDurationMs - 50);
                 }
             }, noteDelayOffset);
