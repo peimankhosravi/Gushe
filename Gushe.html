@@ -917,6 +917,8 @@
         let cleanAscending = []; let cleanNotesOrder = []; combined.forEach(item => { if (cleanAscending.length === 0 || Math.abs(item.centsValue - cleanAscending[cleanAscending.length - 1]) > 0.01) { cleanAscending.push(item.centsValue); cleanNotesOrder.push(item.noteName); } });
         return { path: cleanAscending, notesOrder: cleanNotesOrder, tonic: targetTransposedTonic };
     }
+
+
     function playScalePreview() {
         initAudio(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         const noteCentsMap = {}; noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
@@ -940,7 +942,7 @@
         let cleanDescending = []; let cleanNotesOrderDesc = []; combinedDesc.forEach(item => { if (item.centsValue > setup.tonic + 0.01) { cleanDescending.push(item.centsValue); cleanNotesOrderDesc.push(item.noteName); } });
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
-
+        
         const noteDurationMs = 450; 
         let noteDelayOffset = 0;
 
@@ -948,7 +950,7 @@
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // 1. Note On Thread: Triggers your native voice engine (Leaves timing untouched!)
+            // 1. Note On Thread: Standard timeout trigger ensures your Stop button clears it perfectly
             setTimeout(() => { 
                 if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
             }, noteDelayOffset);
@@ -957,27 +959,27 @@
             setTimeout(() => { 
                 if (!isScalePreviewRunning) return;
 
-                // Fire your native note-off cleanly
+                // Fire your file's native note-off routine cleanly
                 stopVoicePoly(0); 
 
-                // FIX: Check if this is the final note. If it is, ride on the exact same 
-                // highlight-off timer to flip the button state back to "Play" seamlessly!
+                // FIX: Check if this is the absolute final note in the path sequence array.
+                // If it is, toggle the button text back to "Play" seamlessly alongside the highlight thread!
                 const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
                 if (isFinalSequenceStep) {
                     isScalePreviewRunning = false;
-                    if (previewToggleBtn) {
-                        previewToggleBtn.textContent = "Play";
-                        previewToggleBtn.style.backgroundColor = ""; 
-                        previewToggleBtn.style.borderColor = "";
+                    if (previewScaleBtn) {
+                        previewScaleBtn.textContent = "Play";
+                        previewScaleBtn.style.backgroundColor = ""; 
+                        previewScaleBtn.style.borderColor = "";
                     }
                     requestAnimationFrame(updatePlot);
                 }
             }, noteDelayOffset + (noteDurationMs - 50));
 
-            // Advance the timeline spacing cleanly for the next note slot
+            // Advance the timeline spacing cleanly for the next note slot position
             noteDelayOffset += noteDurationMs;
         });
-    } // <--- This closing bracket ends the playScalePreview function
+    }
 
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
