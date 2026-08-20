@@ -376,6 +376,7 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
     }
+
     function startVoicePoly(voiceId, hz, noteName = null) {
         initAudio();
         stopVoicePoly(voiceId);
@@ -387,21 +388,18 @@
         const gainNode = audioCtx.createGain();
         osc.type = 'sine';
         
-        // FIX: Hardlock an absolute time baseline anchor to prevent mobile clock drift
         const now = audioCtx.currentTime;
-        const safeAttackTime = now + 0.015; // 15ms lookahead buffer for mobile processors
-
         osc.frequency.setValueAtTime(hz, now);
         
-        // Explicitly lock the volume baseline at 0 right now
+        // Start the gain at absolute 0
         gainNode.gain.setValueAtTime(0, now);
-        // Smoothly curve up to 0.25 relative to our safe mobile lookahead window
-        gainNode.gain.linearRampToValueAtTime(0.25, safeAttackTime + 0.05);
+        
+        // FIX: Use setTargetAtTime for a flawless exponential curve on mobile screens.
+        // 0.25 = target volume, now = start time, 0.015 = time constant (adjusts attack speed)
+        gainNode.gain.setTargetAtTime(0.25, now, 0.015);
         
         osc.connect(gainNode);
         gainNode.connect(audioCtx.destination);
-        
-        // Explicitly pass the hardware start time anchor
         osc.start(now);
         
         activeVoicesMap.set(voiceId, { osc: osc, gainNode: gainNode, noteName: noteName });
