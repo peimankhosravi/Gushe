@@ -942,40 +942,78 @@
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
 
         const noteDurationMs = 450; 
-        let noteDelayOffset = 0;
+        const durationSec = noteDurationMs / 1000.0;
+        
+        // 1. Establish an absolute starting anchor point on the high-priority hardware clock
+        // A 60ms initial cushion gives mobile threads plenty of time to pre-buffer the sequence
+        let hardwareTimePointer = audioCtx.currentTime + 0.06;
 
         finalMelodyCentsPath.forEach((playCents, idx) => {
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // 1. Note On: Uses your original, timing-pragmatic flat structure
-            setTimeout(() => { 
-                if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
-            }, noteDelayOffset);
+            // 2. Build the oscillator nodes directly on the high-priority hardware sound chip
+            // This runs in a single browser frame, completely bypassing all setTimeout rhythm drift!
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
 
-            // 2. Note Off & Button State Handle
-            setTimeout(() => { 
-                if (!isScalePreviewRunning) return;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(frequencyHz, hardwareTimePointer);
 
-                // Stop the active voice node cleanly
-                stopVoicePoly(0); 
+            // Hardlock pristine hardware envelope shapes natively to the audio context timeline
+            gainNode.gain.setValueAtTime(0, hardwareTimePointer);
+            gainNode.gain.linearRampToValueAtTime(0.25, hardwareTimePointer + 0.05); // Attack Fade
+            gainNode.gain.setValueAtTime(0.25, hardwareTimePointer + durationSec - 0.05);
+            gainNode.gain.linearRampToValueAtTime(0, hardwareTimePointer + durationSec); // Release Fade
 
-                // FIX: Redesigned checking algorithm built right into the sequencer loop.
-                // The exact frame the final index is reached, it returns a direct handle to update the button!
-                const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
-                if (isFinalSequenceStep) {
-                    isScalePreviewRunning = false;
-                    if (previewToggleBtn) {
-                        previewToggleBtn.textContent = "Play";
-                        previewToggleBtn.style.backgroundColor = ""; 
-                        previewToggleBtn.style.borderColor = "";
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.start(hardwareTimePointer);
+            osc.stop(hardwareTimePointer + durationSec);
+
+            // 3. Keep your file's native activeVoicesMap updated so manual Stops clear cleanly
+            activeVoicesMap.set(0, { osc: osc, gainNode: gainNode, noteName: currentNoteName });
+            activeVoicesMap.set("0", { osc: osc, gainNode: gainNode, noteName: currentNoteName });
+
+            // 4. FIX: Check if this is the absolute final note in the path sequence array
+            const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
+
+            if (isFinalSequenceStep) {
+                // The hardware audio chip itself calls this function the exact millisecond the note ends!
+                // This completely bypasses software delays, keeping the button reset stable over the internet.
+                osc.onended = () => {
+                    if (isScalePreviewRunning) {
+                        isScalePreviewRunning = false;
+                        if (previewToggleBtn) {
+                            previewToggleBtn.textContent = "Play";
+                            previewToggleBtn.style.backgroundColor = ""; 
+                            previewToggleBtn.style.borderColor = "";
+                        }
+                        // Clear out the tracking registry maps and refresh the circle canvas graphics
+                        currentlyPlayingNoteNames.clear();
+                        requestAnimationFrame(updatePlot);
                     }
-                    requestAnimationFrame(updatePlot);
-                }
-            }, noteDelayOffset + (noteDurationMs - 50));
+                };
+            }
 
-            // Advance the timeline spacing cleanly for the next note slot
-            noteDelayOffset += noteDurationMs;
+            // 5. Separate UI Flash Thread: Handles ONLY the yellow halo animations on your canvas circles
+            const delayToVisualFlashMs = Math.max(0, (hardwareTimePointer - audioCtx.currentTime) * 1000);
+            
+            setTimeout(() => {
+                if (isScalePreviewRunning && currentNoteName) {
+                    currentlyPlayingNoteNames.add(currentNoteName);
+                    requestAnimationFrame(updatePlot);
+                    
+                    setTimeout(() => {
+                        currentlyPlayingNoteNames.delete(currentNoteName);
+                        requestAnimationFrame(updatePlot);
+                    }, noteDurationMs - 50);
+                }
+            }, delayToVisualFlashMs);
+
+            // Advance the timeline anchor cleanly by the precise note duration step
+            hardwareTimePointer += durationSec;
         });
     } // <--- This closing bracket ends the playScalePreview function
 
