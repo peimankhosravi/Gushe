@@ -412,23 +412,32 @@
     function stopVoicePoly(voiceId) {
         if (activeVoicesMap.has(voiceId)) {
             const voice = activeVoicesMap.get(voiceId);
+            
             if (voice.noteName) {
                 currentlyPlayingNoteNames.delete(voice.noteName);
                 requestAnimationFrame(updatePlot);
             }
+            
             try {
-                // FIX: Grab the current real gain value instantly, lock it to the current time,
-                // and give the mobile hardware a 15ms head-start to render the release ramp cleanly
-                const currentGainVal = voice.gainNode.gain.value;
-                const mobileSafeReleaseTime = audioCtx.currentTime + 0.015;
+                const now = audioCtx.currentTime;
                 
-                voice.gainNode.gain.setValueAtTime(currentGainVal, audioCtx.currentTime);
-                // Slide the volume smoothly down to zero over your preferred envelope cushion window (40ms)
-                voice.gainNode.gain.linearRampToValueAtTime(0, mobileSafeReleaseTime + 0.04);
+                // 1. Force the gain node to lock its current volume at this exact millisecond
+                voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, now);
                 
+                // 2. FIX: Use setTargetAtTime to generate a smooth exponential fade-out on mobile screens
+                // 0 = target volume, now = start time, 0.015 = time constant (controls the fade-out speed)
+                voice.gainNode.gain.setTargetAtTime(0, now, 0.015);
+                
+                // 3. Let the oscillator node play out for a brief window to complete the fade before stopping it completely
                 const targetOsc = voice.osc;
-                setTimeout(() => targetOsc.stop(), 70);
+                setTimeout(() => {
+                    try {
+                        targetOsc.stop();
+                    } catch(e) {}
+                }, 80);
+                
             } catch(e) {}
+            
             activeVoicesMap.delete(voiceId);
         }
     }
