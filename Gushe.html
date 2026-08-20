@@ -1334,13 +1334,17 @@
 
 
 	presetSelect.addEventListener('change', () => { textEntry.value = presetSelect.value; updatePlot(); }); 
+        
+        // 1. Keep your working canvas down trigger
         canvas.addEventListener('pointerdown', handlePointerDown); 
 
+        // 2. FIX: Change these three from 'window' to 'canvas' so they can hear the captured touch data!
+        canvas.addEventListener('pointermove', handlePointerMove); 
+        canvas.addEventListener('pointerup', handlePointerUp);
+        canvas.addEventListener('pointercancel', handlePointerUp); // Safe boundary drop handling
+        
+	window.addEventListener('load', () => { setTimeout(updatePlot, 50); });
 
-        window.addEventListener('pointermove', handlePointerMove); 
-        window.addEventListener('pointerup', handlePointerUp);
-        window.addEventListener('pointercancel', handlePointerUp); // Safe boundary drop handling
-	window.addEventListener('load', () => { setTimeout(updatePlot, 50); }); 
 
 
     // === TABLET STEPPER TRANSPOSITION WHEEL CONTROLLER ===
