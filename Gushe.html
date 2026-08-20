@@ -407,22 +407,20 @@
             }
             try {
                 const prevGain = voice.gainNode.gain;
-                
-                // FIX: Clears desktop timeline cache, forcing mobile browsers to create a smooth, real-time release anchor
-                prevGain.cancelScheduledValues(audioCtx.currentTime);
-                prevGain.setValueAtTime(0.25, audioCtx.currentTime); // Match your startVoicePoly peak volume exactly
-                prevGain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
-                
+                prevGain.setValueAtTime(prevGain.value, audioCtx.currentTime);
+                voice.gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
                 const targetOsc = voice.osc;
                 
                 setTimeout(() => {
-                    try {
-                        targetOsc.stop();
-                    } catch(err) {}
+                    targetOsc.stop();
                     
-                    // Keep your exact working preview toggle style hooks untouched
+                    // FIX: If the preview sequence is running, look inside our active maps
+                    // the moment the oscillator finishes its 60ms fade-out cushion.
                     if (typeof isScalePreviewRunning !== 'undefined' && isScalePreviewRunning) {
+                        // Gather any remaining preview voices (where voiceId is 0)
                         const activePreviewVoices = Array.from(activeVoicesMap.keys()).filter(id => id === 0 || id === "0");
+                        
+                        // If no more scale preview steps are active in the audio registers, we have returned home!
                         if (activePreviewVoices.length === 0) {
                             isScalePreviewRunning = false;
                             const toggleBtn = document.getElementById('preview-scale-btn');
