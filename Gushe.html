@@ -407,27 +407,20 @@
             }
             try {
                 const prevGain = voice.gainNode.gain;
-                const now = audioCtx.currentTime;
-
-                // 1. FIX: Instantly wipe any active attack timelines on the chip to prevent mobile collisions
-                prevGain.cancelScheduledValues(now);
-                
-                // 2. Lock the current volume state as the explicit anchor starting point
-                prevGain.setValueAtTime(prevGain.value, now);
-                
-                // 3. Smoothly slide the volume envelope down to zero over 50 milliseconds
-                prevGain.linearRampToValueAtTime(0, now + 0.05);
-                
+                prevGain.setValueAtTime(prevGain.value, audioCtx.currentTime);
+                voice.gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
                 const targetOsc = voice.osc;
                 
                 setTimeout(() => {
-                    try {
-                        targetOsc.stop();
-                    } catch(err) {}
+                    targetOsc.stop();
                     
-                    // Keep your exact working preview loop style checks completely untouched
+                    // FIX: If the preview sequence is running, look inside our active maps
+                    // the moment the oscillator finishes its 60ms fade-out cushion.
                     if (typeof isScalePreviewRunning !== 'undefined' && isScalePreviewRunning) {
+                        // Gather any remaining preview voices (where voiceId is 0)
                         const activePreviewVoices = Array.from(activeVoicesMap.keys()).filter(id => id === 0 || id === "0");
+                        
+                        // If no more scale preview steps are active in the audio registers, we have returned home!
                         if (activePreviewVoices.length === 0) {
                             isScalePreviewRunning = false;
                             const toggleBtn = document.getElementById('preview-scale-btn');
@@ -441,7 +434,6 @@
                     }
                 }, 60);
             } catch(e) {}
-
             activeVoicesMap.delete(voiceId);
         }
     }
