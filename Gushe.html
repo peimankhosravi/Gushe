@@ -33,12 +33,10 @@
             margin-top: 10px; 
             cursor: pointer; 
             display: block; 
-				/* FIX: Completely disable the mobile browser blue tap-highlight flash box */
+			            /* FIX: Completely disable the mobile browser blue tap-highlight flash box */
             -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
             -webkit-user-select: none; /* Stops text selection popups on hold */
             user-select: none;
-            touch-action: none;
-
         }
         #controls { 
             margin-top: 0px; 
@@ -285,9 +283,9 @@
                 
 		<label class="toggle-container">
                 <input type="checkbox" id="keyboard-toggle" checked>
-                Number Keys (1-0)
+                Keys 1-0
                 <input type="checkbox" id="hold-toggle">
-                Hold (Backspace clears)
+                Hold Note
                 </label>
 
             </div>
@@ -408,17 +406,33 @@
                 requestAnimationFrame(updatePlot);
             }
             try {
-                // FIX: Grab the current real gain value instantly, lock it to the current time,
-                // and give the mobile hardware a 15ms head-start to render the release ramp cleanly
-                const currentGainVal = voice.gainNode.gain.value;
-                const mobileSafeReleaseTime = audioCtx.currentTime + 0.015;
-                
-                voice.gainNode.gain.setValueAtTime(currentGainVal, audioCtx.currentTime);
-                // Slide the volume smoothly down to zero over your preferred envelope cushion window (40ms)
-                voice.gainNode.gain.linearRampToValueAtTime(0, mobileSafeReleaseTime + 0.04);
-                
+                const prevGain = voice.gainNode.gain;
+                prevGain.setValueAtTime(prevGain.value, audioCtx.currentTime);
+                voice.gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
                 const targetOsc = voice.osc;
-                setTimeout(() => targetOsc.stop(), 70);
+                
+                setTimeout(() => {
+                    targetOsc.stop();
+                    
+                    // FIX: If the preview sequence is running, look inside our active maps
+                    // the moment the oscillator finishes its 60ms fade-out cushion.
+                    if (typeof isScalePreviewRunning !== 'undefined' && isScalePreviewRunning) {
+                        // Gather any remaining preview voices (where voiceId is 0)
+                        const activePreviewVoices = Array.from(activeVoicesMap.keys()).filter(id => id === 0 || id === "0");
+                        
+                        // If no more scale preview steps are active in the audio registers, we have returned home!
+                        if (activePreviewVoices.length === 0) {
+                            isScalePreviewRunning = false;
+                            const toggleBtn = document.getElementById('preview-scale-btn');
+                            if (toggleBtn) {
+                                toggleBtn.textContent = "Play";
+                                toggleBtn.style.backgroundColor = "";
+                                toggleBtn.style.borderColor = "";
+                                requestAnimationFrame(updatePlot);
+                            }
+                        }
+                    }
+                }, 60);
             } catch(e) {}
             activeVoicesMap.delete(voiceId);
         }
@@ -1334,17 +1348,12 @@
 
 
 	presetSelect.addEventListener('change', () => { textEntry.value = presetSelect.value; updatePlot(); }); 
-        
-        // 1. Keep your working canvas down trigger
         canvas.addEventListener('pointerdown', handlePointerDown); 
-
-        // 2. FIX: Change these three from 'window' to 'canvas' so they can hear the captured touch data!
-        canvas.addEventListener('pointermove', handlePointerMove); 
-        canvas.addEventListener('pointerup', handlePointerUp);
-        canvas.addEventListener('pointercancel', handlePointerUp); // Safe boundary drop handling
-        
-	window.addEventListener('load', () => { setTimeout(updatePlot, 50); });
-
+ //       canvas.addEventListener('dblclick', handleDoubleClick); 
+        window.addEventListener('pointermove', handlePointerMove); 
+        window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('pointercancel', handlePointerUp); // Safe boundary drop handling
+	window.addEventListener('load', () => { setTimeout(updatePlot, 50); }); 
 
 
     // === TABLET STEPPER TRANSPOSITION WHEEL CONTROLLER ===
