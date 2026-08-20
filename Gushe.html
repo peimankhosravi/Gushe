@@ -950,29 +950,27 @@
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // 1. Note On Thread: Standard timeout trigger preserves your perfect rhythm timing
+            // 1. Note On Thread: Standard timeout trigger ensures your Stop button clears it perfectly
             setTimeout(() => { 
                 if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
             }, noteDelayOffset);
 
-            // 2. Note Off & Automated Interface Return Handle
+            // 2. Note Off & Highlight Off Thread
             setTimeout(() => { 
                 if (!isScalePreviewRunning) return;
 
                 // Fire your file's native note-off routine cleanly
                 stopVoicePoly(0); 
 
-                // Check if this is the absolute final note in the path sequence array.
+                // FIX: Check if this is the absolute final note in the path sequence array.
+                // If it is, toggle the button text back to "Play" seamlessly alongside the highlight thread!
                 const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
                 if (isFinalSequenceStep) {
                     isScalePreviewRunning = false;
-                    
-                    // FIX: Direct DOM lookup changes the text without needing variable scope matching!
-                    const targetBtn = document.getElementById('preview-scale-btn');
-                    if (targetBtn) {
-                        targetBtn.textContent = "Play";
-                        targetBtn.style.backgroundColor = ""; 
-                        targetBtn.style.borderColor = "";
+                    if (previewScaleBtn) {
+                        previewScaleBtn.textContent = "Play";
+                        previewScaleBtn.style.backgroundColor = ""; 
+                        previewScaleBtn.style.borderColor = "";
                     }
                     requestAnimationFrame(updatePlot);
                 }
