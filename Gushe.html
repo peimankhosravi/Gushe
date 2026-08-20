@@ -936,25 +936,48 @@
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
         const noteDurationMs = 450; 
-        let noteDelayOffset = 0;
+        const durationSec = noteDurationMs / 1000.0;
+        
+        let currentStepIndex = 0;
+        // Establish an un-throttled starting anchor on the audio hardware clock
+        let nextNoteHardwareTime = audioCtx.currentTime + 0.05;
 
-        finalMelodyCentsPath.forEach((playCents, idx) => {
+        function runNextSequencerStep() {
+            // Hard boundary: Halt instantly if the sequence is over or if the user hit Stop
+            if (!isScalePreviewRunning || currentStepIndex >= finalMelodyCentsPath.length) {
+                return;
+            }
+
+            const playCents = finalMelodyCentsPath[currentStepIndex];
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
-            const currentNoteName = finalNotesPath[idx];
+            const currentNoteName = finalNotesPath[currentStepIndex];
 
-            // 1. Schedule Note Start: Uses your native engine so circle graphics work perfectly
-            setTimeout(() => { 
-                startVoicePoly(0, frequencyHz, currentNoteName); 
-            }, noteDelayOffset);
+            // 1. Trigger the note using your file's explicit startVoicePoly system
+            // We pass the absolute hardware timestamp so the rhythm remains mathematically perfect
+            startVoicePoly(0, frequencyHz, currentNoteName, nextNoteHardwareTime);
 
-            // 2. FIX: Schedule Note End as a flat, independent timeout to prevent mobile throttling lag
-            setTimeout(() => { 
-                stopVoicePoly(0); 
-            }, noteDelayOffset + (noteDurationMs - 50));
+            // 2. Schedule the matching note-off event to complete the volume envelope fade
+            const exactNoteEndTime = nextNoteHardwareTime + (durationSec - 0.05);
+            
+            setTimeout(() => {
+                // Ensure we only clear the note if the user hasn't hit Stop mid-melody
+                if (isScalePreviewRunning) {
+                    stopVoicePoly(0, exactNoteEndTime);
+                }
+            }, noteDurationMs - 50);
 
-            // Advance the timeline spacing cleanly for the next note slot
-            noteDelayOffset += noteDurationMs;
-        });
+            // Move the step pointer forward and increment our master hardware timeline tracking anchor
+            currentStepIndex++;
+            nextNoteHardwareTime += durationSec;
+
+            // 3. Queue up the next note step sequentially to prevent mobile CPU throttling lag
+            if (currentStepIndex < finalMelodyCentsPath.length) {
+                setTimeout(runNextSequencerStep, noteDurationMs);
+            }
+        }
+
+        // Trigger the first step of our schedule-safe sequence instantly
+        runNextSequencerStep();
     } // <--- This closing bracket ends the playScalePreview function
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
