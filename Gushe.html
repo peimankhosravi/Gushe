@@ -275,11 +275,9 @@
                 <button class="btn-export" id="export-scl-btn">Export scl</button>
                 <label class="btn-file-load" for="file-input">Load Preset</label>
 		<input type="file" id="file-input" accept=".txt, .TXT, text/plain">
- 
-		<!-- === Replace your old single play button with these two dedicated actions === -->
-		<button class="btn-file-load" id="play-scale-btn" style="min-width: 60px; background-color: #00cea6; color: white;">Play</button>
-		<button class="btn-file-load" id="stop-scale-btn" style="min-width: 60px; background-color: #ff4d4d; color: white; margin-left: 5px;">Stop</button>
-
+                <!-- 3. Unified Media Play/Stop Toggle Control -->
+                <button class="btn-file-load" id="preview-scale-btn" style="min-width: 80px; transition: all 0.1s ease;">Play</button>
+                
 		<label class="toggle-container">
                 <input type="checkbox" id="keyboard-toggle" checked>
                 Keys 1-0
@@ -422,43 +420,14 @@
                 const targetOsc = voice.osc;
                 const now = audioCtx.currentTime;
                 
-                // 1. Instantly clear out any active attack curves running on the hardware chip
                 prevGain.cancelScheduledValues(now);
-                
-                // 2. Lock the current volume state as the explicit anchor starting point for the release fade
                 prevGain.setValueAtTime(prevGain.value, now);
-                
-                // 3. Schedule the volume envelope to ramp smoothly down to zero over 50ms (0.05s) on the audio chip
                 prevGain.linearRampToValueAtTime(0, now + 0.05);
-                
-                // 4. FIX: Redesign note lifecycle tracking to pull the plug using the native hardware clock timeline.
-                // This completely bypasses setTimeout, stopping the oscillator the exact millisecond the volume hits zero.
                 targetOsc.stop(now + 0.05);
                 
             } catch(e) {}
             
-            // 5. ISOLATED FALLBACK: This timer ONLY handles the interface text buttons style hooks 
-            // for the scale preview loop. It no longer controls or touches your real physical audio voice lifespans!
-            setTimeout(() => {
-                if (typeof isScalePreviewRunning !== 'undefined' && isScalePreviewRunning) {
-                    
-                    // FIX: Filter for your unique lookahead preview keys to prevent mobile map data collisions
-                    const activePreviewVoices = Array.from(activeVoicesMap.keys()).filter(id => 
-                        id === 0 || id === "0" || (typeof id === 'string' && id.startsWith("preview_scale_"))
-                    );
-                    
-                    if (activePreviewVoices.length === 0) {
-                        isScalePreviewRunning = false;
-                        const toggleBtn = document.getElementById('preview-scale-btn');
-                        if (toggleBtn) {
-                            toggleBtn.textContent = "Play";
-                            toggleBtn.style.backgroundColor = "";
-                            toggleBtn.style.borderColor = "";
-                            requestAnimationFrame(updatePlot);
-                        }
-                    }
-                }
-            }, 60);
+            // ❌ THE BAD 60MS SETTIMEOUT WAS REMOVED ENTIRELY FROM HERE!
 
             activeVoicesMap.delete(voiceId);
         }
@@ -952,20 +921,36 @@
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // 1. Note On Thread: Perfect original timing
+            // 1. Note On Thread: Preserves your perfect, original flat rhythm layout
             setTimeout(() => { 
                 if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
             }, noteDelayOffset);
 
-            // 2. Note Off Thread: Pure audio termination with zero layout interference
+            // 2. Note Off Thread: Purely deterministic step handling
             setTimeout(() => { 
-                if (isScalePreviewRunning) stopVoicePoly(0); 
+                if (!isScalePreviewRunning) return;
+
+                // Stop the active voice slot cleanly
+                stopVoicePoly(0); 
+
+                // FIX: The sequencer returns a completion state flag naturally at the final step!
+                const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
+                if (isFinalSequenceStep) {
+                    isScalePreviewRunning = false;
+                    
+                    if (previewToggleBtn) {
+                        previewToggleBtn.textContent = "Play";
+                        previewToggleBtn.style.backgroundColor = ""; 
+                        previewToggleBtn.style.borderColor = "";
+                    }
+                    requestAnimationFrame(updatePlot);
+                }
             }, noteDelayOffset + (noteDurationMs - 50));
 
             // Advance the timeline spacing cleanly for the next note slot position
             noteDelayOffset += noteDurationMs;
         });
-    } // <--- Closing bracket of playScalePreview function
+    }
 
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
@@ -1337,44 +1322,50 @@
         stopAllVoices();
     }
 
-    // === SEPARATE PREVIEW ACTION CONTROLLERS ===
+    // === UNIFIED PLAY / STOP MULTI-TOGGLE CONTROLLER ===
+    const previewToggleBtn = document.getElementById('preview-scale-btn');
     let isScalePreviewRunning = false;
-    const playScaleBtn = document.getElementById('play-scale-btn');
-    const stopScaleBtn = document.getElementById('stop-scale-btn');
 
-    // 1. Dedicated Play Handler
-    if (playScaleBtn) {
-        playScaleBtn.addEventListener('click', () => {
-            if (!isScalePreviewRunning) {
+    if (previewToggleBtn) {
+        previewToggleBtn.addEventListener('click', () => {
+            if (isScalePreviewRunning) {
+                // ACTION: EMERGENCY AUDIO STOP COMMAND
+                isScalePreviewRunning = false;
+                
+                // Explicitly silence the visual notehead staff voice node
+                stopVoicePoly("notehead_staff_touch_voice");
+                
+                // Terminate global voice registers and active audio mapping arrays
+                if (typeof clearAllHeldNotes === 'function') {
+                    clearAllHeldNotes();
+                } else if (typeof stopAllVoices === 'function') {
+                    stopAllVoices();
+                }
+                
+                // Clear any running browser timeouts to freeze the melody loop instantly
+                let highestTimeoutId = setTimeout(() => {}, 0);
+                for (let i = highestTimeoutId; i >= 0; i--) {
+                    clearTimeout(i);
+                }
+
+                // Reset button appearance back to the standard green playable layout
+                previewToggleBtn.textContent = "Play";
+                previewToggleBtn.style.backgroundColor = ""; 
+                previewToggleBtn.style.borderColor = "";
+                
+                if (typeof updatePlot === 'function') updatePlot();
+            } else {
+                // ACTION: START SCALE PLAYBACK LOOP
                 isScalePreviewRunning = true;
-                playScalePreview();
-            }
-        });
-    }
+                previewToggleBtn.textContent = "Stop";
+                previewToggleBtn.style.backgroundColor = "#ff4d4d"; // Switch to alert red layout
+                previewToggleBtn.style.borderColor = "#ff3333";
 
-    // 2. Dedicated Stop Handler
-    if (stopScaleBtn) {
-        stopScaleBtn.addEventListener('click', () => {
-            isScalePreviewRunning = false;
-            
-            // Clear out your active melody timeouts instantly
-            let highestTimeoutId = setTimeout(() => {}, 0);
-            for (let i = highestTimeoutId; i >= 0; i--) {
-                clearTimeout(i);
+                // Execute your core sequential melody preview routine
+                if (typeof playScalePreview === 'function') {
+                    playScalePreview();
+                }
             }
-
-            // Wipe your active visual canvas halos and registries
-            currentlyPlayingNoteNames.clear();
-            stopVoicePoly("notehead_staff_touch_voice");
-            
-            if (typeof clearAllHeldNotes === 'function') {
-                clearAllHeldNotes();
-            } else if (typeof stopAllVoices === 'function') {
-                stopAllVoices();
-            }
-            
-            stopVoicePoly(0); // Instantly terminate the active preview sound slot
-            if (typeof updatePlot === 'function') updatePlot();
         });
     }
 
