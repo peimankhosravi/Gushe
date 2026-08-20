@@ -405,7 +405,6 @@
     }
 
 
-
     function stopVoicePoly(voiceId) {
         if (activeVoicesMap.has(voiceId)) {
             const voice = activeVoicesMap.get(voiceId);
@@ -432,6 +431,7 @@
             activeVoicesMap.delete(voiceId);
         }
     }
+
 
 
 
@@ -921,28 +921,29 @@
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // 1. Note On Thread: Preserves your perfect, original flat rhythm layout
+            // 1. Note On Thread: Standard timeout trigger ensures your Stop button clears it perfectly
             setTimeout(() => { 
                 if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
             }, noteDelayOffset);
 
-            // 2. Note Off Thread: Purely deterministic step handling
+            // 2. Note Off & Highlight Off Thread
             setTimeout(() => { 
                 if (!isScalePreviewRunning) return;
 
-                // Stop the active voice slot cleanly
+                // Fire your file's native note-off routine cleanly
                 stopVoicePoly(0); 
 
-                // FIX: The sequencer returns a completion state flag naturally at the final step!
+                // FIX: Check if this is the absolute final note in the path sequence array.
+                // If it is, toggle the button text back to "Play" seamlessly alongside the highlight thread!
                 const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
                 if (isFinalSequenceStep) {
                     isScalePreviewRunning = false;
-                    
                     if (previewToggleBtn) {
-                        previewToggleBtn.textContent = "Play";
-                        previewToggleBtn.style.backgroundColor = ""; 
-                        previewToggleBtn.style.borderColor = "";
-                    }
+   			previewToggleBtn.textContent = "Play";
+    			previewToggleBtn.style.backgroundColor = ""; 
+   			previewToggleBtn.style.borderColor = "";
+		     }
+
                     requestAnimationFrame(updatePlot);
                 }
             }, noteDelayOffset + (noteDurationMs - 50));
