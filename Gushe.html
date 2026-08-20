@@ -1,3 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fixed Unified Dastgah Engine</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-select=no, shrink-to-fit=no">
+
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background-color: white; 
+            margin: 10; 
+            padding: 0px;
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            justify-content: flex-start;
+            min-height: 100vh; 
+            box-sizing: border-box;
+
+			            /* UNIVERSAL TABLET UNFLASH FIX */
+            -webkit-tap-highlight-color: transparent !important;
+            tap-highlight-color: transparent !important;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            outline: none !important;
+        }
+
+        #canvas { 
+            background: white; 
+            margin-top: 10px; 
+            cursor: pointer; 
+            display: block; 
+			            /* FIX: Completely disable the mobile browser blue tap-highlight flash box */
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            -webkit-user-select: none; /* Stops text selection popups on hold */
+            user-select: none;
+        }
+        #controls { 
+            margin-top: 0px; 
+            max-width: 900px; 
+            width: 100%; 
+            text-align: left; 
+            padding-bottom: 20px; 
+            box-sizing: border-box; 
+        }
+        .control-group { 
+            margin-bottom: 12px; 
+        }
+        .menu-row { 
+            display: flex; 
+            align-items: flex-end; 
+            gap: 15px; 
+            margin-bottom: 10px; 
+            width: 100%;
+ 
+        }
+        .menu-container { 
+            width: 25%; 
+            min-width: 160px; 
+            transform: translateY(-3px); 
+        }
+        .btn-container { 
+            flex-grow: 1; 
+            display: flex; 
+            gap: 5px; 
+        }
+        label { 
+            font-weight: bold; 
+            font-size: 12px; 
+            color: #222; 
+            display: block; 
+            margin-bottom: 0px; 
+        }
+        input[type="text"], select { 
+            width: 100%; 
+            height: 30px; 
+            padding: 6px 6px; 
+            font-size: 14px; 
+            background: #f9f9f9; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            box-sizing: border-box; 
+        }
+        .btn-export { 
+            width: 20%; 
+            padding: 0px 0px; 
+            font-size: 12px; 
+            font-weight: bold; 
+            background-color: #00cea6; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            height: 20px; 
+            box-sizing: border-box; 
+            transition: background-color 0.15s ease; 
+        }
+        .btn-export:hover { 
+            background-color: #00b591; 
+        }
+        .btn-file-load { 
+            width: 20%; 
+            background-color: #4a5568; 
+            color: white;  
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 12px; 
+            font-weight: bold; 
+            border-radius: 4px; 
+            padding: 0px 0px; 
+            cursor: pointer; 
+            height: 20px; 
+            box-sizing: border-box; 
+            border: none; 
+            text-wrap: nowrap; 
+        }
+        .btn-file-load:hover { 
+            background-color: #2d3748; 
+        }
+
+        #file-input { 
+            display: none; 
+        }
+        select { 
+            height: 30px; 
+        }
+        .toggle-container {
+            display: inline-flex; 
+            align-items: center; 
+            gap: 8px; 
+            height: 20px;
+            font-weight: bold; 
+            font-size: 8px; 
+            color: #333; 
+            cursor: pointer; 
+            user-select: none;
+        }
+
+
+
+        /* Simple Tablet Parameter Stepper Box Layout */
+        .stepper-container {
+            display: inline-flex;
+            align-items: center;
+            background: #f7fafc; 
+            padding: 6px 6px; 
+            border-radius: 6px; 
+            border: 3px solid #e2e8f0; 
+            margin-top: 30px;
+            gap: 5px;
+            width: fit-content;
+        }
+
+        .stepper-btn {
+            background: #ffffff;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            width: 10px;
+            height: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #2d3748;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: manipulation; /* Removes mobile touch tap delays */
+            transition: all 0.1s ease;
+        }
+
+        .stepper-btn:active {
+            background: #edf2f7;
+            border-color: #a0aec0;
+        }
+
+        .stepper-display-box {
+            background: #ffffff;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            min-width: 110px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+            font-size: 12px;
+            font-weight: bold;
+            color: #1a202c;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+
+        /* Auto-scale the embedded 1200px canvas to fit flat inside tight tablet screens */
+        #canvas {
+            max-width: 100%;
+            height: auto; /* Maintains correct aspect ratio on touch screens */
+            box-sizing: border-box;
+            touch-action: none; /* Crucial for Google Sites: stops browser window scrolling while performing */
+        }
+        
+        #controls {
+            max-width: 100%;
+            box-sizing: border-box;
+            padding: 0px;
+        }
+
+        /* Ensure Google Sites wrapper adapts without horizontal overflow */
+        .menu-row {
+            flex-wrap: wrap; /* Lets buttons wrap gracefully onto a new row if width drops below 768px */
+            gap: 10px;
+        }
+        .menu-container, .btn-container {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+
+
+    </style>
+</head>
+    <body>
+
+        <!-- Super simple tablet note-stepping key alignment control -->
+        <div class="control-group" style="width: 100%; display: flex; justify-content: center; margin-bottom: 15px;">
+            <div class="stepper-container">
+                
+                <!-- 1. Alignment Stepper Tools -->
+                <button class="stepper-btn" id="stepper-prev-btn" type="button">&lt;</button>
+                <div class="stepper-display-box" id="stepper-note-display">C (0¢)</div>
+                <button class="stepper-btn" id="stepper-next-btn" type="button">&gt;</button>
+                
+
+                </div>
+
+
+
+
+            </div>
+        </div>
+
+
+    <div id="controls">
+        <div class="menu-row">
+            <div class="menu-container">
+               
+                <select id="preset-select">
+                    <option value="Šur = C(a), D(f), E koron, F, G, A(m)-A koron, B flat">Šur</option>
+                    <option value="Dashti (Šur) = C, D(f), E koron, F(a), G, A(s)-A koron, B flat">Dashti (Šur)</option>
+                    <option value="Abu Atā (Šur) = C(a), D(f), E koron(a+i), F, G(a+s), A">Abu Atā (Šur)</option>
+                    <option value="Bayat-e Tork (Šur) = C(a+i), D, E koron, F(f+s), G, A, B flat">Bayat-e Tork (Šur)</option>
+                    <option value="Afshari (Šur) = C(f), D, E koron(i), F, G(a+s), A koron(m)-A flat, B flat">Afshari (Šur)</option>
+                    <option value="Māhur = C(f+a), D(s), E, F, G, A, B"> Māhur </option>
+                    <option value="Segāh = C, D, E koron(t+a+s), F, G, A koron, B flat-B koron"> Segāh </option>
+                    <option value="Čahārgāh = G, A koron(a), B, C(f), D koron, E, F"> Čahārgāh </option>
+                    <option value="Homāyun = E koron(a), F(i), G(f), A koron(s), B, C, D "> Homāyun </option>
+                    <option value="Bayāt-e Esfahān (Homāyun) = D, E koron(i), F sori, G(a+t), A, B flat, C, D">Bayāt-e Esfahān (Homāyun)</option>
+                    <option value="Navā = D, E koron(i), F(a), G(f), A, B flat, C"> Navā </option>
+                    <option value="Rast-Panjgah = C, D, E, F(a+f), G, A, B flat"> Rast-Panjgah </option>
+                    <option value="Harmonic Limit-15 = C(H8), 9/8(H9), 5/4(H10), 11/8(H11), 3/2(H12), 13/8(H13), 14/8(H14), 15/8(H15)"> Harmonic Limit-15 </option>
+                    <option value="Farhat = C, 90, 135, 205, 295, 340, 410, 500, 565, 630, 700, 790, 835, 905, 995, 1040, 1130"> Farhat </option>
+		    <option value="EDO = C, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150"> EDO </option>
+                </select>
+
+            </div>
+
+    </div>
+
+        <div class="control-group">
+            <input type="text" id="text-entry" value="Šur = C(a), D(f), E koron, F, G, A(m)-A koron, B flat">
+        </div>
+
+
+            <div class="btn-container">
+                <button class="btn-export" id="export-scl-btn">Export scl</button>
+                <label class="btn-file-load" for="file-input">Load Preset</label>
+		<input type="file" id="file-input" accept=".txt, .TXT, text/plain">
+                <!-- 3. Unified Media Play/Stop Toggle Control -->
+                <button class="btn-file-load" id="preview-scale-btn" style="min-width: 80px; transition: all 0.1s ease;">Play</button>
+                
+		<label class="toggle-container">
+                <input type="checkbox" id="keyboard-toggle" checked>
+                Number Keys (1-0)
+                <input type="checkbox" id="hold-toggle">
+                Hold (Backspace clears)
+                </label>
+
+            </div>
+
+	<div class="control-group" style="width: 100%; display: flex; justify-content: center; margin-bottom: 15px;">
+		<canvas id="canvas" width="700" height="650"></canvas>
+	</div>
+
+        <div class="control-group" style="background: #f7fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-top: 15px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <input type="range" id="master-cents-slider" min="-200" max="200" value="0" step="1" style="flex-grow: 1; accent-color: #00cea6; cursor: pointer;">
+                <div style="font-family: monospace; font-size: 12px; font-weight: bold; background: white; padding: 4px 10px; border-radius: 4px; border: 1px solid #cbd5e0; min-width: 50px; text-align: center; color: #2d3748;">
+                    C: <span id="cents-display">0</span>¢ (<span id="hz-display">261.63</span> Hz)
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+
+<script>
+    const masterNoteMatrix = [
+        { name: "C", ratio: "1/1", type: "dynamic" },
+        { name: "C sori", ratio: "33/32", type: "dynamic" },
+        { name: "D flat", ratio: "256/243", type: "dynamic" },
+        { name: "D koron", ratio: "12/11", type: "dynamic" },
+        { name: "D", ratio: "9/8", type: "dynamic" },
+        { name: "E flat", ratio: "32/27", type: "dynamic" },
+        { name: "E koron", ratio: "27/22", type: "dynamic" },
+        { name: "E", ratio: "81/64", type: "dynamic" },
+        { name: "F", ratio: "4/3", type: "dynamic" },
+        { name: "F sori", ratio: "11/8", type: "dynamic" },
+        { name: "F sharp", ratio: "729/512", type: "dynamic" },
+        { name: "G koron", ratio: "16/11", type: "dynamic" },
+        { name: "G", ratio: "3/2", type: "dynamic" },
+        { name: "A flat", ratio: "128/81", type: "dynamic" },
+        { name: "A koron", ratio: "18/11", type: "dynamic" },
+        { name: "A", ratio: "27/16", type: "dynamic" },
+        { name: "B flat", ratio: "16/9", type: "dynamic" },
+        { name: "B koron", ratio: "81/44", type: "dynamic" },
+        { name: "B", ratio: "243/128", type: "dynamic" },
+        { name: "C koron", ratio: "64/33", type: "dynamic" }
+    ];
+    const noteNames = masterNoteMatrix.map(n => n.name);
+    const ratios = masterNoteMatrix.map(n => n.ratio);
+    const customPitches = {};
+    const cents = [];
+    const nodeTypes = [];
+    let primaryLoopNotes = [];
+    let detourMap = {};
+    let functionalTags = {};
+    let parsedFirstTonicName = null;
+    let masterBaseHz = 261.63;
+    function getHarmonicProfile(num, den) {
+        while (num % 2 === 0 && num > 0) num = Math.floor(num / 2);
+        while (den % 2 === 0 && den > 0) den = Math.floor(den / 2);
+        return [num, den];
+    }
+    function getCleanSymbolLabel(inputName) {
+        return inputName
+            .replace(" sori", "s")
+            .replace(" koron", "k")
+            .replace(" flat", "♭")
+            .replace(" sharp", "♯");
+    }
+    masterNoteMatrix.forEach((node) => {
+        const rawStr = node.ratio;
+        const slashPos = rawStr.indexOf("/");
+        const num = Number(rawStr.substring(0, slashPos));
+        const den = Number(rawStr.substring(slashPos + 1));
+        const c_val = 1200.0 * Math.log2(num / den);
+        node.calculatedCents = c_val;
+        cents.push(c_val);
+        const profile = getHarmonicProfile(num, den);
+        let temp_top = profile, temp_bot = profile;
+        while (temp_top % 3 === 0 && temp_top > 0) temp_top = Math.floor(temp_top / 3);
+        while (temp_bot % 3 === 0 && temp_bot > 0) temp_bot = Math.floor(temp_bot / 3);
+        nodeTypes.push((temp_top === 11 || temp_bot === 11) ? 'limit_11' : 'pythagorean');
+        node.txtLine1 = getCleanSymbolLabel(node.name) + " (" + node.ratio + ")";
+        node.txtLine2 = Math.round(c_val) + "¢";
+    });
+    let audioCtx = null;
+    const activeVoicesMap = new Map();
+    const currentlyPlayingNoteNames = new Set();
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+    function startVoicePoly(voiceId, hz, noteName = null) {
+        initAudio();
+        stopVoicePoly(voiceId);
+        if (activeVoicesMap.size >= 4) {
+            const oldestVoiceKey = activeVoicesMap.keys().next().value;
+            stopVoicePoly(oldestVoiceKey);
+        }
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(hz, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.05);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        activeVoicesMap.set(voiceId, { osc: osc, gainNode: gainNode, noteName: noteName });
+        if (noteName) {
+            currentlyPlayingNoteNames.add(noteName);
+            requestAnimationFrame(updatePlot);
+        }
+    }
+    function stopVoicePoly(voiceId) {
+        if (activeVoicesMap.has(voiceId)) {
+            const voice = activeVoicesMap.get(voiceId);
+            if (voice.noteName) {
+                currentlyPlayingNoteNames.delete(voice.noteName);
+                requestAnimationFrame(updatePlot);
+            }
+            try {
+                // FIX: Grab the current gain level instantly, lock it, and force a lookahead cushion 
+                // so the mobile hardware clock never outruns the linear release ramp
+                const currentGainVal = voice.gainNode.gain.value;
+                const safeReleaseTime = audioCtx.currentTime + 0.01;
+                
+                voice.gainNode.gain.setValueAtTime(currentGainVal, audioCtx.currentTime);
+                voice.gainNode.gain.linearRampToValueAtTime(0, safeReleaseTime + 0.04);
+                
+                const targetOsc = voice.osc;
+                setTimeout(() => targetOsc.stop(), 65);
+            } catch(e) {}
+
+            activeVoicesMap.delete(voiceId);
+        }
+    }
+
+    function stopAllVoices() {
+        for (const key of activeVoicesMap.keys()) {
+            stopVoicePoly(key);
+        }
+    }
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const textEntry = document.getElementById('text-entry');
+    const presetSelect = document.getElementById('preset-select');
+    const fileInput = document.getElementById('file-input');
+    const keyboardToggle = document.getElementById('keyboard-toggle');
+    const centerX = 350, centerY = 330, radius = 270;
+    let nodeClickAreas = []; 
+    let currentRotationOffset = 0; 
+    let isDraggingScale = false;
+    let initialDragMouseAngle = 0;
+    let baseAngleAtDragStart = 0;
+    let activeVisualScaleNotes = new Set();
+    let computedScaleName = "Custom_Dastgah";
+    function matchClosestMatrixNote(targetCents) {
+        let bestMatch = "C";
+        let minDiff = Infinity;
+        for (let i = 0; i < masterNoteMatrix.length; i++) {
+            let diff = Math.abs(cents[i] - targetCents);
+            if (diff > 600) diff = 1200 - diff;
+            if (diff < minDiff) {
+                minDiff = diff;
+                bestMatch = masterNoteMatrix[i].name;
+            }
+        }
+        return bestMatch;
+    }
+        function parseSingleItem(itemStr, functionalTags, baseOffset = 0, itemIndex = 0) {
+        let cleaned = itemStr.trim();
+        let annotation = null;
+        if (cleaned.includes("(") && cleaned.endsWith(")")) {
+            const openIdx = cleaned.indexOf("(");
+            annotation = cleaned.substring(openIdx + 1, cleaned.length - 1).trim();
+            cleaned = cleaned.substring(0, openIdx).trim();
+        }
+        let pitch = cleaned;
+        let pitchOverrideValue = null;
+        const isFraction = cleaned.includes("/");
+        const isNumericValue = !isNaN(parseFloat(cleaned)) && isFinite(cleaned);
+        if (isFraction || isNumericValue) {
+            if (isFraction) {
+                const slashPos = cleaned.indexOf("/");
+                const num = Number(cleaned.substring(0, slashPos));
+                const den = Number(cleaned.substring(slashPos + 1));
+                if (!isNaN(num) && !isNaN(den) && den > 0) {
+                    pitchOverrideValue = 1200.0 * Math.log2(num / den);
+                }
+            } else {
+                pitchOverrideValue = parseFloat(cleaned);
+            }
+            if (pitchOverrideValue !== null) {
+                const absoluteCents = (pitchOverrideValue + baseOffset + 12000.0) % 1200.0;
+                // Force a unique identifier suffix so adjacent values never collide
+                pitch = matchClosestMatrixNote(absoluteCents) + "__" + itemIndex;
+                customPitches[pitch] = absoluteCents;
+            }
+        }
+        
+        // Check both standard match and unique tracking names
+        if (noteNames.includes(pitch) || pitch.includes("__")) {
+            if (annotation !== null) functionalTags[pitch] = annotation;
+            return pitch;
+        }
+        return null;
+    }
+
+    function checkCurrentAlignmentLock() {
+        const rawText = textEntry.value;
+        let notesString = rawText;
+        if (rawText.includes("=")) {
+            notesString = rawText.split("=")[1].trim();
+        }
+        const items = notesString.split(",").map(s => s.trim()).filter(Boolean);
+        
+        // Skip check entirely if any token is a raw cent number or mathematical fraction ratio
+        let isCustomNumericOrRatioScale = false;
+        items.forEach(item => {
+            let cleanedItem = item;
+            if (cleanedItem.includes("-")) cleanedItem = cleanedItem.split("-")[0].trim();
+            if (cleanedItem.includes("(")) cleanedItem = cleanedItem.split("(")[0].trim();
+            
+            const isFraction = cleanedItem.includes("/");
+            const isNumericValue = !isNaN(parseFloat(cleanedItem)) && isFinite(cleanedItem);
+            if (isFraction || isNumericValue) {
+                isCustomNumericOrRatioScale = true;
+            }
+        });
+        
+        if (isCustomNumericOrRatioScale) return true; // Bypass lock restrictions for numeric tuning matrices
+
+        const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
+        let currentLockState = true;
+        activeVisualScaleNotes.forEach(activePitch => {
+            const baseIdx = noteNames.indexOf(activePitch);
+            if (baseIdx >= 0) {
+                const structuralPosition = (customPitches[activePitch] !== undefined) ? 
+                    customPitches[activePitch] : cents[baseIdx];
+                const rotatedPosition = (structuralPosition + rotationCents + 12000.0) % 1200.0;
+                let shortestDistanceToANode = Infinity;
+                for (let n = 0; n < cents.length; n++) {
+                    const nodePos = cents[n];
+                    let diff = Math.abs(rotatedPosition - nodePos);
+                    if (diff > 600) diff = 1200 - diff;
+                    if (diff < shortestDistanceToANode) shortestDistanceToANode = diff;
+                }
+                if (shortestDistanceToANode > 3.0) currentLockState = false;
+            }
+        });
+        return currentLockState;
+    }
+
+    function updatePlot() {
+        for (let key in customPitches) delete customPitches[key];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        nodeClickAreas = [];
+        activeVisualScaleNotes = new Set();
+        activeVisualScaleNotes.add("C"); 
+        const rotationOffset = ((parseFloat(currentRotationOffset) * Math.PI) / 180.0);
+        ctx.beginPath(); ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI); ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 32; i++) {
+            const gridAngle = (i * 5.625) * Math.PI / 180;
+            const cosG = Math.cos(gridAngle);
+            const sinG = Math.sin(gridAngle);
+            ctx.moveTo(centerX - radius * cosG, centerY - radius * sinG);
+            ctx.lineTo(centerX + radius * cosG, centerY + radius * sinG);
+        }
+        ctx.stroke();
+        const staticCoords = {};
+        const labelCoords = {};
+        masterNoteMatrix.forEach((node) => {
+            const angle = (-90 + (node.calculatedCents / 1200.0) * 360) * Math.PI / 180.0;
+            staticCoords[node.name] = { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) };
+            let labelRadius = radius + 32;
+            if (node.name === "F sharp" || node.name === "F sori") {
+                labelRadius = radius + 32;
+            } else if (node.name === "C koron" || node.name === "C sori") {
+                labelRadius = radius + 30;
+            } else if (node.name === "G" || node.name === "G koron" || node.name === "F" || node.name === "G flat") {
+                labelRadius = radius + 20; 
+            } else if (node.name === "C" || node.name === "D flat" || node.name === "B" || node.name === "B koron" || node.name === "D" || node.name === "D koron") {
+                labelRadius = radius + 22;
+            }
+            labelCoords[node.name] = { x: centerX + labelRadius * Math.cos(angle), y: centerY + labelRadius * Math.sin(angle) };
+        });
+        const rawText = textEntry.value;
+        let modeName = "", notesString = rawText;
+        if (rawText.includes("=")) {
+            const eqPos = rawText.indexOf("=");
+            modeName = rawText.substring(0, eqPos).trim(); 
+            notesString = rawText.substring(eqPos + 1).trim();
+        }
+        computedScaleName = modeName ? modeName.replace(/\s+/g, '_') : "Custom_Dastgah";
+        const items = notesString.split(",").map(s => s.trim()).filter(Boolean);
+        primaryLoopNotes = []; detourMap = {}; functionalTags = {};
+        const explicitDetours = [];
+        
+        // Stage 1: Detect if the first item specifies a valid base note name (e.g., "D")
+        let scaleRootOffsetCents = 0;
+        if (items.length > 0) {
+            let firstItemRaw = items[0].trim();
+            if (firstItemRaw.includes("-")) firstItemRaw = firstItemRaw.split("-")[0].trim();
+            if (firstItemRaw.includes("(")) firstItemRaw = firstItemRaw.split("(")[0].trim();
+            
+            const rootMatrixIdx = noteNames.indexOf(firstItemRaw);
+            if (rootMatrixIdx >= 0) {
+                scaleRootOffsetCents = cents[rootMatrixIdx];
+            }
+        }
+        
+        // Stage 2: Pass that root offset down so numbers stack from the true scale tonic
+        items.forEach((item, idx) => {
+            if (item.includes("-")) {
+                const dashIdx = item.indexOf("-");
+                const pPart = item.substring(0, dashIdx).trim();
+                const dPart = item.substring(dashIdx + 1).trim();
+                const pNote = parseSingleItem(pPart, functionalTags, scaleRootOffsetCents, idx + "_p");
+                const dNote = parseSingleItem(dPart, functionalTags, scaleRootOffsetCents, idx + "_d");
+                if (pNote && dNote) {
+                    primaryLoopNotes.push(pNote); activeVisualScaleNotes.add(pNote);
+                    detourMap[pNote] = dNote; activeVisualScaleNotes.add(dNote);
+                    explicitDetours.push(dNote);
+                }
+            } else {
+                const pNote = parseSingleItem(item, functionalTags, scaleRootOffsetCents, idx);
+                if (pNote) { primaryLoopNotes.push(pNote); activeVisualScaleNotes.add(pNote); }
+            }
+        });
+        primaryLoopNotes = primaryLoopNotes.filter(note => !explicitDetours.includes(note));
+
+        if (primaryLoopNotes.length > 0) {
+            parsedFirstTonicName = primaryLoopNotes[0];
+        }
+
+
+        const rotCoords = {}; const funcCoords = {}; const rawCoordsUnsnapped = {}; 
+        
+        // 1. Initialize baseline tracking coordinates for background dots
+        noteNames.forEach((name, i) => {
+            const staticCents = cents[i];
+            const angleStatic = ((-90 + (staticCents / 1200.0) * 360) * Math.PI / 180.0) + rotationOffset;
+            rotCoords[name] = { x: centerX + radius * Math.cos(angleStatic), y: centerY + radius * Math.sin(angleStatic) };
+        });
+
+        // 2. Generate precision visual coordinates for every active custom pitch string item
+        activeVisualScaleNotes.forEach((uniqueName) => {
+            if (customPitches[uniqueName] !== undefined) {
+                const dynamicCents = customPitches[uniqueName];
+                const angleDynamic = ((-90 + (dynamicCents / 1200.0) * 360) * Math.PI / 180.0) + rotationOffset;
+                rawCoordsUnsnapped[uniqueName] = { x: centerX + radius * Math.cos(angleDynamic), y: centerY + radius * Math.sin(angleDynamic) };
+                funcCoords[uniqueName] = { x: centerX + (radius - 36) * Math.cos(angleDynamic), y: centerY + (radius - 36) * Math.sin(angleDynamic) };
+            } else {
+                const baseName = uniqueName.split("__")[0];
+                const baseIdx = noteNames.indexOf(baseName);
+                const staticCents = baseIdx >= 0 ? cents[baseIdx] : 0;
+                const angleStatic = ((-90 + (staticCents / 1200.0) * 360) * Math.PI / 180.0) + rotationOffset;
+                funcCoords[uniqueName] = { x: centerX + (radius - 36) * Math.cos(angleStatic), y: centerY + (radius - 36) * Math.sin(angleStatic) };
+            }
+        });
+
+
+        primaryLoopNotes = primaryLoopNotes.filter(note => !Object.values(detourMap).includes(note));
+        primaryLoopNotes.sort((a, b) => {
+            const centsA = (customPitches[a] !== undefined) ? customPitches[a] : cents[noteNames.indexOf(a)];
+            const centsB = (customPitches[b] !== undefined) ? customPitches[b] : cents[noteNames.indexOf(b)];
+            return centsA - centsB;
+        });
+
+        if (modeName) {
+            ctx.fillStyle = '#00cea6'; ctx.font = 'bold 26px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(modeName, centerX, centerY);
+        }
+        if (primaryLoopNotes.length > 1) {
+            ctx.beginPath(); ctx.strokeStyle = '#00cea6'; ctx.lineWidth = 3.5;
+            for (let i = 0; i < primaryLoopNotes.length; i++) {
+                const n1 = primaryLoopNotes[i]; const n2 = primaryLoopNotes[(i + 1) % primaryLoopNotes.length];
+                const pt1 = (rawCoordsUnsnapped[n1] !== undefined) ? rawCoordsUnsnapped[n1] : rotCoords[n1];
+                const pt2 = (rawCoordsUnsnapped[n2] !== undefined) ? rawCoordsUnsnapped[n2] : rotCoords[n2];
+                if (pt1 && pt2) { if (i === 0) ctx.moveTo(pt1.x, pt1.y); ctx.lineTo(pt2.x, pt2.y); }
+            }
+            ctx.stroke();
+        }
+        if (primaryLoopNotes.length > 1) {
+            ctx.beginPath(); ctx.strokeStyle = 'crimson'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+            for (let i = 0; i < primaryLoopNotes.length; i++) {
+                const pNote = primaryLoopNotes[i];
+                if (detourMap[pNote]) {
+                    const dNote = detourMap[pNote]; 
+                    const prevNote = primaryLoopNotes[(primaryLoopNotes.indexOf(pNote) - 1 + primaryLoopNotes.length) % primaryLoopNotes.length]; 
+                    const nextNote = primaryLoopNotes[(primaryLoopNotes.indexOf(pNote) + 1) % primaryLoopNotes.length];
+                    const ptPrev = (rawCoordsUnsnapped[prevNote] !== undefined) ? rawCoordsUnsnapped[prevNote] : rotCoords[prevNote];
+                    const ptDetour = (rawCoordsUnsnapped[dNote] !== undefined) ? rawCoordsUnsnapped[dNote] : rotCoords[dNote];
+                    const ptNext = (rawCoordsUnsnapped[nextNote] !== undefined) ? rawCoordsUnsnapped[nextNote] : rotCoords[nextNote];
+                    if (ptPrev && ptDetour && ptNext) { ctx.moveTo(ptPrev.x, ptPrev.y); ctx.lineTo(ptDetour.x, ptDetour.y); ctx.lineTo(ptNext.x, ptNext.y); }
+                }
+            }
+            ctx.stroke(); ctx.setLineDash([]);
+        }
+        Object.keys(functionalTags).forEach(pitch => {
+            if (funcCoords[pitch] && functionalTags[pitch]) {
+                const { x, y } = funcCoords[pitch]; const tagText = functionalTags[pitch];
+                ctx.font = 'bold 12px "Times New Roman"'; const textWidth = ctx.measureText(tagText).width; const dynamicRadius = Math.max(16, (textWidth / 2) + 8);
+                ctx.beginPath(); ctx.arc(x, y, dynamicRadius, 0, 2 * Math.PI); ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = 'black'; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.fillStyle = 'black'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(tagText, x, y);
+            }
+        });
+        masterNoteMatrix.forEach((node) => {
+            const pt = staticCoords[node.name]; const lblPt = labelCoords[node.name];
+            let elementStyleColor = 'black'; 
+            if (node.name.includes('sori')) {
+                elementStyleColor = 'red'; 
+            } else if (node.name.includes('sharp')) {
+                elementStyleColor = 'brown'; 
+            } else if (node.name.includes('koron')) {
+                elementStyleColor = 'blue';
+            } else if (node.name.includes('flat')) {
+                elementStyleColor = 'purple';
+            }
+            ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, 2 * Math.PI); ctx.fillStyle = elementStyleColor; ctx.fill();
+            ctx.fillStyle = elementStyleColor; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(node.txtLine1, lblPt.x, lblPt.y - 5); 
+            ctx.fillText(node.txtLine2, lblPt.x, lblPt.y + 5); 
+            let cX = rotCoords[node.name].x, cY = rotCoords[node.name].y;
+            
+            // Check if any of our active unique tokens match this background note name
+            let hasActiveCustomPitch = false;
+            let customCentsValues = []; // Gather ALL custom cent coordinates sharing this node
+            
+            for (let uniqueKey of activeVisualScaleNotes) {
+                if (uniqueKey.split("__")[0] === node.name && customPitches[uniqueKey] !== undefined) {
+                    hasActiveCustomPitch = true;
+                    customCentsValues.push(customPitches[uniqueKey]);
+                }
+            }
+
+            if (hasActiveCustomPitch) {
+                // Loop through and cleanly draw every individual microtonal point assigned here
+                customCentsValues.forEach(customCentsValue => {
+                    const angleDynamic = ((-90 + (customCentsValue / 1200.0) * 360) * Math.PI / 180.0) + rotationOffset;
+                    const cX_dyn = centerX + radius * Math.cos(angleDynamic);
+                    const cY_dyn = centerY + radius * Math.sin(angleDynamic);
+                    ctx.beginPath(); ctx.arc(cX_dyn, cY_dyn, 5.5, 0, 2 * Math.PI); ctx.fillStyle = 'rgba(255, 235, 59, .9)'; ctx.fill(); 
+                });
+            }
+
+
+            // FIX: Check if this specific node name was clicked directly on the unrotated boundary pins
+            let isCircleTouchNodePlaying = false;
+            for (let voiceId of activeVoicesMap.keys()) {
+                if (typeof voiceId === 'string' && voiceId.startsWith("canvas_touch_")) {
+                    const voiceObj = activeVoicesMap.get(voiceId);
+                    if (voiceObj && voiceObj.noteName === "static_grid_node__" + node.name) {
+                        isCircleTouchNodePlaying = true;
+                        break;
+                    }
+                }
+            }
+
+            // Gather all active visual keys sharing this background note name to track keys and previews cleanly
+            let activePlayingTargetKeys = [];
+            for (let visualScaleKey of activeVisualScaleNotes) {
+                if (visualScaleKey.split("__")[0] === node.name) {
+                    if (currentlyPlayingNoteNames.has(visualScaleKey)) {
+                        activePlayingTargetKeys.push(visualScaleKey);
+                    }
+                }
+            }
+
+            // Fallback for standard traditional note presets without unique tracking suffixes
+            if (activePlayingTargetKeys.length === 0 && currentlyPlayingNoteNames.has(node.name) && !isCircleTouchNodePlaying) {
+                activePlayingTargetKeys.push(node.name);
+            }
+
+            // Draw visual halo rings for active custom scale nodes (keys/previews)
+            activePlayingTargetKeys.forEach(targetKey => {
+                let highlightX = cX;
+                let highlightY = cY;
+                if (rawCoordsUnsnapped[targetKey] !== undefined) {
+                    highlightX = rawCoordsUnsnapped[targetKey].x;
+                    highlightY = rawCoordsUnsnapped[targetKey].y;
+                }
+
+                ctx.beginPath(); 
+                ctx.arc(highlightX, highlightY, 18, 0, 2 * Math.PI); 
+                ctx.fillStyle = 'rgba(0, 206, 166, 0.25)'; 
+                ctx.fill();
+                ctx.strokeStyle = '#00cea6'; 
+                ctx.lineWidth = 2.0; 
+                ctx.stroke();
+            });
+
+            // If an unrotated border pin tap is active, paint its ring ONLY on its fixed static background position
+            if (isCircleTouchNodePlaying) {
+                ctx.beginPath();
+                ctx.arc(staticCoords[node.name].x, staticCoords[node.name].y, 18, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(0, 206, 166, 0.25)';
+                ctx.fill();
+                ctx.strokeStyle = '#00cea6';
+                ctx.lineWidth = 2.0;
+                ctx.stroke();
+            }
+
+
+            if (node.name === parsedFirstTonicName) {
+                ctx.beginPath(); ctx.arc(cX, cY, 11, 0, 2 * Math.PI); ctx.fillStyle = 'rgba(0, 206, 166, 0.4)'; ctx.fill();
+                ctx.strokeStyle = '#00cea6'; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+	    const frequencyHz = masterBaseHz * Math.pow(2.0, node.calculatedCents / 1200.0);
+            nodeClickAreas.push({ name: node.name, x: lblPt.x, y: lblPt.y, radius: 25, hz: frequencyHz }); 
+            nodeClickAreas.push({ name: node.name, x: pt.x, y: pt.y, radius: 12, hz: frequencyHz });
+        });
+        const exportBtn = document.getElementById('export-scl-btn');
+
+
+        if (exportBtn) { if (checkCurrentAlignmentLock()) { exportBtn.style.backgroundColor = '#00ffc4'; exportBtn.style.color = '#111'; } else { exportBtn.style.backgroundColor = '#00cea6'; exportBtn.style.color = 'white'; } }
+
+        // SYNC: Update the tablet stepper box display text automatically based on current live rotation alignment
+        const stepperDisplay = document.getElementById('stepper-note-display');
+        if (stepperDisplay) {
+            const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
+            
+            // Reconstruct what the active first scale degree cent position is relative to rotation
+            let liveTonicCents = 0;
+            if (parsedFirstTonicName) {
+                const cleanKey = parsedFirstTonicName.split("__")[0];
+                const fallbackIdx = noteNames.indexOf(cleanKey);
+                const nativeCents = customPitches[parsedFirstTonicName] !== undefined ? 
+                    customPitches[parsedFirstTonicName] : (fallbackIdx >= 0 ? cents[fallbackIdx] : 0);
+                liveTonicCents = (nativeCents + rotationCents + 12000.0) % 1200.0;
+            } else {
+                liveTonicCents = (rotationCents + 12000.0) % 1200.0;
+            }
+
+            // Find which background matrix grid pin is closest to our active floating first degree position
+            let closestIdx = 0;
+            let minDiff = Infinity;
+            for (let n = 0; n < cents.length; n++) {
+                let diff = Math.abs(cents[n] - liveTonicCents);
+                if (diff > 600) diff = 1200 - diff;
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIdx = n;
+                }
+            }
+
+            // Update the stepper index pointer globally so arrow button pushes remain synchronized
+            currentStepperIndex = closestIdx;
+            
+            // Print out the clear text string into our tablet value field
+            const activeNodeName = masterNoteMatrix[closestIdx].name;
+            const activeNodeCents = Math.round(masterNoteMatrix[closestIdx].calculatedCents);
+            stepperDisplay.textContent = `${activeNodeName} (${activeNodeCents}¢)`;
+        }
+
+
+        // SYNC: Update the scale step step-player display name word automatically when layout shifts
+        if (typeof refreshActiveStepDisplay === 'function') {
+            refreshActiveStepDisplay();
+        }
+
+    }
+
+
+
+
+
+    function getCleanAscendingTransposed() {
+        const noteCentsMap = {}; noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
+        let scaleNotesList = [...primaryLoopNotes]; 
+        scaleNotesList = scaleNotesList.filter(note => !Object.values(detourMap).includes(note));
+        if (scaleNotesList.length === 0) return { path: [], notesOrder: [], tonic: 0 };
+
+        const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
+        let ascendingTransposed = []; let associatedNotes = [];
+        scaleNotesList.forEach(note => {
+            const baseCents = customPitches[note] !== undefined ? customPitches[note] : noteCentsMap[note];
+            if (detourMap[note]) {
+                const partner = detourMap[note]; const partnerCents = customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner];
+                let p1 = (baseCents + rotationCents + 12000.0) % 1200.0; let p2 = (partnerCents + rotationCents + 12000.0) % 1200.0;
+                if (p1 > p2) { ascendingTransposed.push(p1); associatedNotes.push(note); } else { ascendingTransposed.push(p2); associatedNotes.push(partner); }
+            } else { ascendingTransposed.push((baseCents + rotationCents + 12000.0) % 1200.0); associatedNotes.push(note); }
+        });
+        const initialTonicNote = parsedFirstTonicName || scaleNotesList; const baseTonicCents = customPitches[initialTonicNote] !== undefined ? customPitches[initialTonicNote] : noteCentsMap[initialTonicNote]; const targetTransposedTonic = (baseTonicCents + rotationCents + 12000.0) % 1200.0;
+        let combined = ascendingTransposed.map((c, idx) => { let normalized = c; if (normalized < targetTransposedTonic - 0.01) normalized += 1200.0; return { centsValue: normalized, noteName: associatedNotes[idx] }; });
+        combined.sort((a, b) => a.centsValue - b.centsValue);
+        let cleanAscending = []; let cleanNotesOrder = []; combined.forEach(item => { if (cleanAscending.length === 0 || Math.abs(item.centsValue - cleanAscending[cleanAscending.length - 1]) > 0.01) { cleanAscending.push(item.centsValue); cleanNotesOrder.push(item.noteName); } });
+        return { path: cleanAscending, notesOrder: cleanNotesOrder, tonic: targetTransposedTonic };
+    }
     function playScalePreview() {
         initAudio(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         const noteCentsMap = {}; noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
@@ -36,3 +913,475 @@
         });
 
     }
+    const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
+    const latchedKeyboardKeys = new Set();
+    function getDetourCentsForNote(note, noteCentsMap) { if (!detourMap[note]) return null; const partner = detourMap[note]; return customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner]; }
+    window.addEventListener('keydown', (e) => {
+
+        // Trigger the clear function on Backspace if not actively typing text
+        if (e.code === 'Backspace' && document.activeElement !== textEntry) {
+            e.preventDefault();
+            clearAllHeldNotes();
+            return; // Stops execution here so it doesn't run note math
+        }
+
+        if (!keyboardToggle.checked || document.activeElement === textEntry) return;
+        const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
+
+        const targetIndex = codeMap[e.code]; if (targetIndex === undefined) return;
+        const holdActive = document.getElementById('hold-toggle').checked;
+
+        if (holdActive) {
+            if (latchedKeyboardKeys.has(e.code)) {
+                latchedKeyboardKeys.delete(e.code);
+                stopVoicePoly(targetIndex);
+                delete activeKeyboardKeyToNoteNameMap[e.code];
+                return;
+            }
+            latchedKeyboardKeys.add(e.code);
+        } else {
+            if (activeKeyboardKeysHeld[e.code]) return; 
+            activeKeyboardKeysHeld[e.code] = true;
+        }
+
+        const setup = getCleanAscendingTransposed(); if (!setup || !setup.path || setup.path.length === 0) return;
+        let targetCents = null; let noteNamePlayed = null; const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
+        const noteCentsMap = {}; noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
+        const isUpperCasedAction = e.shiftKey || e.getModifierState('CapsLock'); 
+
+        let filteredNotesList = [...primaryLoopNotes].filter(note => !Object.values(detourMap).includes(note));
+        
+        filteredNotesList.sort((a, b) => {
+            const rawA = customPitches[a] !== undefined ? customPitches[a] : noteCentsMap[a];
+            const rawB = customPitches[b] !== undefined ? customPitches[b] : noteCentsMap[b];
+            let normA = (rawA + rotationCents + 12000.0) % 1200.0;
+            let normB = (rawB + rotationCents + 12000.0) % 1200.0;
+            if (normA < setup.tonic - 0.01) normA += 1200.0;
+            if (normB < setup.tonic - 0.01) normB += 1200.0;
+            return normA - normB;
+        });
+
+        const octaveIndex = Math.min(filteredNotesList.length, 9);
+        if (targetIndex < filteredNotesList.length) {
+            const noteNameAtKey = filteredNotesList[targetIndex];
+            
+            if (isUpperCasedAction && detourMap[noteNameAtKey]) {
+                noteNamePlayed = detourMap[noteNameAtKey];
+            } else {
+                noteNamePlayed = noteNameAtKey;
+            }
+
+            // Extract the core text token format structure from your text input field
+            const rawText = textEntry.value;
+            let notesString = rawText.includes("=") ? rawText.split("=")[1] : rawText;
+            let isCustomScale = notesString.includes("/") || /[0-9]/.test(notesString);
+
+            let baseCents = 0;
+            if (customPitches[noteNamePlayed] !== undefined) {
+                baseCents = customPitches[noteNamePlayed];
+            } else {
+                const baseMatrixName = noteNamePlayed.split("__")[0];
+                const targetNoteIdx = noteNames.indexOf(baseMatrixName);
+                baseCents = targetNoteIdx >= 0 ? cents[targetNoteIdx] : 0;
+            }
+
+            if (isCustomScale) {
+                // Play absolute, un-transposed intervals matching your floating green lines
+                targetCents = baseCents;
+            } else {
+                // Traditional named notes scale: Apply visual graph wheel rotation offsets
+                targetCents = (baseCents + rotationCents + 12000.0) % 1200.0;
+                if (targetCents < setup.tonic - 0.01) targetCents += 1200.0;
+            }
+
+        } else if (targetIndex === octaveIndex) { 
+
+            targetCents = setup.tonic + 1200.0; 
+            noteNamePlayed = parsedFirstTonicName || (filteredNotesList.length > 0 ? filteredNotesList[0] : "C"); 
+        }
+
+        if (targetCents !== null) { 
+            e.preventDefault(); 
+            const frequencyHz = masterBaseHz * Math.pow(2.0, targetCents / 1200.0); 
+            activeKeyboardKeyToNoteNameMap[e.code] = noteNamePlayed; 
+            
+            // FIX: Pass the full unique token string so the visual engine can isolate overlapping scale degrees
+            startVoicePoly(targetIndex, frequencyHz, noteNamePlayed); 
+        }
+
+
+    });
+        window.addEventListener('keyup', (e) => {
+        const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
+
+        if (codeMap[e.code] !== undefined) { 
+            activeKeyboardKeysHeld[e.code] = false; 
+            const holdActive = document.getElementById('hold-toggle').checked;
+            if (!holdActive && !latchedKeyboardKeys.has(e.code)) {
+                stopVoicePoly(codeMap[e.code]); 
+                delete activeKeyboardKeyToNoteNameMap[e.code]; 
+            }
+        }
+    });
+
+    function handlePointerDown(e) {
+        // Prevent default touch behaviors (like viewport scrolling/zooming) while playing
+        if (e.pointerType === 'touch') canvas.setPointerCapture(e.pointerId);
+        
+        const rect = canvas.getBoundingClientRect(); 
+        
+        // FIX: Scale raw touch pixels to perfectly match your 700x650 internal canvas resolution
+        const mx = (e.clientX - rect.left) * (canvas.width / rect.width); 
+        const my = (e.clientY - rect.top) * (canvas.height / rect.height); 
+        
+        let soundNodeTriggered = false;
+        
+        for (let area of nodeClickAreas) { 
+            const dist = Math.hypot(mx - area.x, my - area.y); 
+
+            if (dist <= area.radius) { 
+                const noteInstance = masterNoteMatrix.find(n => n.name === area.name);
+                const slashPos = noteInstance.ratio.indexOf("/");
+                const num = Number(noteInstance.ratio.substring(0, slashPos));
+                const den = Number(noteInstance.ratio.substring(slashPos + 1));
+                const baseCentsValue = 1200.0 * Math.log2(num / den);
+                const nonTransposedHz = 261.63 * Math.pow(2.0, baseCentsValue / 1200.0);
+                
+                const holdActive = document.getElementById('hold-toggle').checked;
+                // Create a distinct note-specific ID so it can be latched independently of individual fingertip contact indices
+                const touchVoiceId = "canvas_touch_" + area.name.replace(/\s+/g, '_');
+
+                if (holdActive) {
+                    // Toggle Note Latch behavior when Hold Notes is checked
+                    if (activeVoicesMap.has(touchVoiceId)) {
+                        stopVoicePoly(touchVoiceId);
+                    } else {
+                        startVoicePoly(touchVoiceId, nonTransposedHz, "static_grid_node__" + area.name); 
+                    }
+                } else {
+                    // Standard momentary touch playback behavior
+                    startVoicePoly("canvas_touch_" + e.pointerId, nonTransposedHz, "static_grid_node__" + area.name); 
+                }
+                
+                soundNodeTriggered = true; 
+                break; 
+            }
+        }
+    }
+
+
+    function handlePointerMove(e) { return; }
+
+    function handlePointerUp(e) { 
+        if (e.pointerType === 'touch') {
+            try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+        }
+        isDraggingScale = false; 
+        // Stop only the specific voice tied to this finger release, preserving other held nodes
+        stopVoicePoly("canvas_touch_" + e.pointerId); 
+    }
+
+    function handleDoubleClick(e) { 
+        const rect = canvas.getBoundingClientRect(); 
+        const mx = e.clientX - rect.left; 
+        const my = e.clientY - rect.top; 
+        if (Math.hypot(mx - centerX, my - centerY) <= radius + 90) { 
+            currentRotationOffset = 0; 
+            updatePlot(); 
+        } 
+    }
+
+    async function exportToScala() {
+        // 1. Identify the structural format of your input scale string tokens
+        const rawText = textEntry.value;
+        let notesString = rawText.includes("=") ? rawText.split("=")[1] : rawText;
+        const items = notesString.split(",").map(s => s.trim()).filter(Boolean);
+        
+        let isCentsScale = false;
+        let isRatioScale = false;
+        items.forEach(item => {
+            let cleanedItem = item.replace(/\(.*?\)/g, "").replace(/-.*/g, "").trim();
+            const isFraction = cleanedItem.includes("/");
+            const isNumericValue = !isNaN(parseFloat(cleanedItem)) && isFinite(cleanedItem);
+            
+            if (isFraction) isRatioScale = true;
+            else if (isNumericValue) isCentsScale = true;
+        });
+        const isTraditionalScale = !isCentsScale && !isRatioScale;
+
+        // Condition: Only apply geometric alignment checks if it's a traditional scale
+        if (isTraditionalScale && !checkCurrentAlignmentLock()) { 
+            alert("Export Aborted: One or more geometric line intersections sit more than 3 cents away from a valid pitch node."); 
+            return; 
+        }
+
+        // 2. Conditionally handle rotation math based on your scale definition types
+        let rotationCents = 0;
+        if (isTraditionalScale) {
+            rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
+        }
+
+        let activeScalePitches = [];
+        
+        activeVisualScaleNotes.forEach(uniqueKey => {
+            // Retrieve the baseline cent height of this item step
+            let nativeCents = customPitches[uniqueKey];
+            if (nativeCents === undefined) {
+                const baseName = uniqueKey.split("__")[0];
+                const baseIdx = noteNames.indexOf(baseName);
+                if (baseIdx >= 0) nativeCents = cents[baseIdx];
+            }
+
+            if (nativeCents !== undefined) {
+                // Compute the operational absolute position (Rotation applies ONLY if traditional scale)
+                const targetCentsValue = (nativeCents + rotationCents + 12000.0) % 1200.0;
+                
+                // Match this coordinate spot to the absolute closest physical background matrix pin node
+                let closestMatrixIdx = 0;
+                let minDiff = Infinity;
+                for (let n = 0; n < cents.length; n++) {
+                    let diff = Math.abs(cents[n] - targetCentsValue);
+                    if (diff > 600) diff = 1200 - diff;
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestMatrixIdx = n;
+                    }
+                }
+
+                activeScalePitches.push({
+                    name: noteNames[closestMatrixIdx],
+                    cents: cents[closestMatrixIdx],
+                    ratio: ratios[closestMatrixIdx],
+                    originalCents: nativeCents,
+                    key: uniqueKey
+                });
+            }
+        });
+
+        if (activeScalePitches.length === 0) return;
+
+        // 3. FLAWLESS CHRONOLOGICAL SHUFFLE: Order notes strictly from C (0 cents) up across the grid
+        if (isTraditionalScale) {
+            activeScalePitches.sort((a, b) => a.cents - b.cents);
+        } else {
+            activeScalePitches.sort((a, b) => a.originalCents - b.originalCents);
+        }
+
+        // 4. Extract the true baseline fundamental ("C") as the implicit zero reference path
+        const rootTonic = activeScalePitches.shift();
+        const baselineCents = isTraditionalScale ? rootTonic.cents : rootTonic.originalCents;
+
+        // 5. Calculate relative interval steps for all subsequent active notes
+        const linesData = [];
+        activeScalePitches.forEach((item) => {
+            let currentCents = isTraditionalScale ? item.cents : item.originalCents;
+            let relativeCents = currentCents - baselineCents;
+            if (relativeCents < -0.01) relativeCents += 1200.0;
+            
+            if (relativeCents > 0.01) {
+                let valueString = "";
+                
+                if (isCentsScale) {
+                    // Untransposed Cents scales print relative calculated decimal steps exactly as typed
+                    valueString = relativeCents.toFixed(5);
+                } else if (isTraditionalScale) {
+                    // Rotated traditional scales look up the true static fraction of the resting pin node
+                    valueString = item.ratio;
+                } else {
+                    // Untransposed Ratio Scales: Pull the direct textual fraction token string from your raw input box
+                    const parts = item.key.split("__");
+                    let matchedOriginalToken = "";
+                    if (parts.length > 1) {
+                        const uniqueSuffix = parts[1];
+                        let targetIdx = -1;
+                        if (uniqueSuffix.includes("_p")) targetIdx = parseInt(uniqueSuffix.split("_p")[0]);
+                        else if (uniqueSuffix.includes("_d")) targetIdx = parseInt(uniqueSuffix.split("_d")[0]);
+                        else targetIdx = parseInt(uniqueSuffix);
+                        
+                        if (!isNaN(targetIdx) && items[targetIdx]) {
+                            let tok = items[targetIdx];
+                            if (tok.includes("-")) tok = uniqueSuffix.includes("_d") ? tok.split("-")[1] : tok.split("-")[0];
+                            if (tok.includes("(")) tok = tok.split("(")[0];
+                            matchedOriginalToken = tok.trim();
+                        }
+                    }
+                    valueString = matchedOriginalToken.includes("/") ? matchedOriginalToken : item.ratio;
+                }
+
+                linesData.push({
+                    name: item.name,
+                    valueString: valueString
+                });
+            }
+        });
+
+        // 6. Build the dynamic Scala file structure matching your exact scale layout
+        let sclContent = `! ${computedScaleName}.scl\n`;
+        sclContent += `Custom Scale Exporter - Dynamic Hybrid Format Engine\n`;
+        sclContent += `${linesData.length + 1}\n`;
+        sclContent += `!\n`;
+
+        linesData.forEach(item => {
+            sclContent += `${item.valueString}\n`;
+        });
+        sclContent += `2/1\n`; // Append standard 2/1 octave step to complete the scale cycle wrap-around
+        sclContent += `!\n`;
+
+        // 7. NOTE_NAMES: Follows the pristine graphic sorted order and leaves out the octave label
+        let namesRow = `! @ABL NOTE_NAMES "${rootTonic.name}"`;
+        linesData.forEach(item => {
+            namesRow += ` "${item.name}"`;
+        });
+        sclContent += `${namesRow}\n`;
+        sclContent += `! @ABL REFERENCE_PITCH 0 0 ${masterBaseHz.toFixed(2)}\n`;
+
+        // 8. Stream the file download directly to your directory
+        const blob = new Blob([sclContent], { type: 'text/plain;charset=utf-8' }); 
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob); 
+        link.download = `${computedScaleName}.scl`; 
+        document.body.appendChild(link); 
+        link.click(); 
+        document.body.removeChild(link); 
+        URL.revokeObjectURL(link.href);
+    }
+
+
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const contents = evt.target.result; const lines = contents.split(/\r?\n/); presetSelect.innerHTML = ''; let parsedFirstPresetValue = null;
+            lines.forEach(line => { const cleanedLine = line.trim(); if (cleanedLine.includes('=')) { const equalsIndex = cleanedLine.indexOf('='); const modeTitle = cleanedLine.substring(0, equalsIndex).trim(); const opt = document.createElement('option'); opt.value = cleanedLine; opt.textContent = modeTitle; presetSelect.appendChild(opt); if (!parsedFirstPresetValue) parsedFirstPresetValue = cleanedLine; } });
+            if (parsedFirstPresetValue) { presetSelect.value = parsedFirstPresetValue; textEntry.value = parsedFirstPresetValue; updatePlot(); }
+        };
+        reader.readAsText(file);
+    });
+
+    textEntry.addEventListener('input', updatePlot); document.getElementById('export-scl-btn').addEventListener('click', exportToScala); 
+
+    document.getElementById('master-cents-slider').addEventListener('input', (e) => {
+        const centsOffset = parseFloat(e.target.value);
+        masterBaseHz = 261.63 * Math.pow(2.0, centsOffset / 1200.0);
+        document.getElementById('cents-display').textContent = (centsOffset >= 0 ? "+" : "") + centsOffset;
+        document.getElementById('hz-display').textContent = masterBaseHz.toFixed(2);
+        updatePlot();
+    });
+
+    document.getElementById('hold-toggle').addEventListener('change', (e) => {
+        if (!e.target.checked) {
+            latchedKeyboardKeys.clear();
+            stopAllVoices();
+        }
+    });
+
+    // Clears all currently sustained/latched voices without touching the UI checkbox
+    function clearAllHeldNotes() {
+        latchedKeyboardKeys.clear();
+        stopAllVoices();
+    }
+
+    // === UNIFIED PLAY / STOP MULTI-TOGGLE CONTROLLER ===
+    const previewToggleBtn = document.getElementById('preview-scale-btn');
+    let isScalePreviewRunning = false;
+
+    if (previewToggleBtn) {
+        previewToggleBtn.addEventListener('click', () => {
+            if (isScalePreviewRunning) {
+                // ACTION: EMERGENCY AUDIO STOP COMMAND
+                isScalePreviewRunning = false;
+                
+                // Explicitly silence the visual notehead staff voice node
+                stopVoicePoly("notehead_staff_touch_voice");
+                
+                // Terminate global voice registers and active audio mapping arrays
+                if (typeof clearAllHeldNotes === 'function') {
+                    clearAllHeldNotes();
+                } else if (typeof stopAllVoices === 'function') {
+                    stopAllVoices();
+                }
+                
+                // Clear any running browser timeouts to freeze the melody loop instantly
+                let highestTimeoutId = setTimeout(() => {}, 0);
+                for (let i = highestTimeoutId; i >= 0; i--) {
+                    clearTimeout(i);
+                }
+
+                // Reset button appearance back to the standard green playable layout
+                previewToggleBtn.textContent = "Play";
+                previewToggleBtn.style.backgroundColor = ""; 
+                previewToggleBtn.style.borderColor = "";
+                
+                if (typeof updatePlot === 'function') updatePlot();
+            } else {
+                // ACTION: START SCALE PLAYBACK LOOP
+                isScalePreviewRunning = true;
+                previewToggleBtn.textContent = "Stop";
+                previewToggleBtn.style.backgroundColor = "#ff4d4d"; // Switch to alert red layout
+                previewToggleBtn.style.borderColor = "#ff3333";
+
+                // Execute your core sequential melody preview routine
+                if (typeof playScalePreview === 'function') {
+                    playScalePreview();
+                }
+            }
+        });
+    }
+
+
+
+	presetSelect.addEventListener('change', () => { textEntry.value = presetSelect.value; updatePlot(); }); 
+        canvas.addEventListener('pointerdown', handlePointerDown); 
+ //       canvas.addEventListener('dblclick', handleDoubleClick); 
+        window.addEventListener('pointermove', handlePointerMove); 
+        window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('pointercancel', handlePointerUp); // Safe boundary drop handling
+	window.addEventListener('load', () => { setTimeout(updatePlot, 50); }); 
+
+
+    // === TABLET STEPPER TRANSPOSITION WHEEL CONTROLLER ===
+    const stepperPrevBtn = document.getElementById('stepper-prev-btn');
+    const stepperNextBtn = document.getElementById('stepper-next-btn');
+    const stepperNoteDisplay = document.getElementById('stepper-note-display');
+
+    // Keep track of which background node index is currently targeted by our step selection
+    let currentStepperIndex = 0;
+
+    function updateStepperAlignment(indexChange) {
+        // Move selection index forward or backward, wrapping around cleanly across our 21 master nodes
+        currentStepperIndex = (currentStepperIndex + indexChange + masterNoteMatrix.length) % masterNoteMatrix.length;
+        
+        const targetedNode = masterNoteMatrix[currentStepperIndex];
+        const targetCentsValue = cents[currentStepperIndex];
+
+        // Fetch the active un-rotated tonic position of your scale's first degree
+        let nativeTonicCents = 0;
+        if (parsedFirstTonicName) {
+            const cleanTonicKey = parsedFirstTonicName.split("__")[0];
+            const fallbackIdx = noteNames.indexOf(cleanTonicKey);
+            nativeTonicCents = customPitches[parsedFirstTonicName] !== undefined ? 
+                customPitches[parsedFirstTonicName] : (fallbackIdx >= 0 ? cents[fallbackIdx] : 0);
+        }
+
+        // Calculate the absolute angular shift required to snap the first scale degree onto your targeted node
+        let requiredShiftCents = targetCentsValue - nativeTonicCents;
+        
+        // Convert cent height value straight back to a raw graphic angular wheel offset degree
+        currentRotationOffset = (requiredShiftCents * 360.0) / 1200.0;
+
+        // Force a total layout refresh across all canvas structures and audio key listeners
+        updatePlot();
+    }
+
+    // Attach manipulation triggers optimized for quick tablet fingertip taps
+    stepperPrevBtn.addEventListener('click', () => updateStepperAlignment(-1));
+    stepperNextBtn.addEventListener('click', () => updateStepperAlignment(1));
+
+
+
+	updatePlot();
+</script>
+</body>
+</html>
+
