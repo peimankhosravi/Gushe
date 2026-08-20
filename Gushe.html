@@ -375,13 +375,14 @@
     }
 
 
-    // FIX: Added customTime parameter so the sequencer can hardlock precise time slots
-    function startVoicePoly(voiceId, hz, noteName = null, customTime = null) {
+    function startVoicePoly(voiceId, hz, noteName = null) {
         initAudio();
         
-        // Instant mobile unfreeze safety block
-        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-        
+        // FIX: Force the suspended mobile audio hardware context to unlock instantly on user touch gesture
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+
         stopVoicePoly(voiceId);
         if (activeVoicesMap.size >= 4) {
             const oldestVoiceKey = activeVoicesMap.keys().next().value;
@@ -390,19 +391,12 @@
         const osc = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
         osc.type = 'sine';
-        
-        // Use the lookahead timestamp if passed, otherwise fall back to real-time touch clock
-        const targetTime = customTime !== null ? customTime : audioCtx.currentTime;
-        
-        osc.frequency.setValueAtTime(hz, targetTime);
-        gainNode.gain.setValueAtTime(0, targetTime);
-        gainNode.gain.linearRampToValueAtTime(0.25, targetTime + 0.05);
+        osc.frequency.setValueAtTime(hz, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.05);
         osc.connect(gainNode);
         gainNode.connect(audioCtx.destination);
-        
-        // Pass the target time straight to the native hardware trigger
-        osc.start(targetTime);
-        
+        osc.start();
         activeVoicesMap.set(voiceId, { osc: osc, gainNode: gainNode, noteName: noteName });
         if (noteName) {
             currentlyPlayingNoteNames.add(noteName);
@@ -918,114 +912,50 @@
         let cleanAscending = []; let cleanNotesOrder = []; combined.forEach(item => { if (cleanAscending.length === 0 || Math.abs(item.centsValue - cleanAscending[cleanAscending.length - 1]) > 0.01) { cleanAscending.push(item.centsValue); cleanNotesOrder.push(item.noteName); } });
         return { path: cleanAscending, notesOrder: cleanNotesOrder, tonic: targetTransposedTonic };
     }
-
     function playScalePreview() {
-        initAudio(); 
-        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-        
-        const noteCentsMap = {}; 
-        noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
-        
+        initAudio(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        const noteCentsMap = {}; noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
         let scaleNotesList = [...primaryLoopNotes]; 
         scaleNotesList = scaleNotesList.filter(note => !Object.values(detourMap).includes(note));
         if (scaleNotesList.length === 0) return;
 
         const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
-        let descendingTransposed = []; 
-        let associatedNotesDesc = [];
-        
+        let descendingTransposed = []; let associatedNotesDesc = [];
         scaleNotesList.forEach(note => {
             const baseCents = customPitches[note] !== undefined ? customPitches[note] : noteCentsMap[note];
             if (detourMap[note]) {
-                const partner = detourMap[note]; 
-                const partnerCents = customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner];
-                let p1 = (baseCents + rotationCents + 12000.0) % 1200.0; 
-                let p2 = (partnerCents + rotationCents + 12000.0) % 1200.0;
-                if (p1 < p2) { descendingTransposed.push(p1); associatedNotesDesc.push(note); } 
-                else { descendingTransposed.push(p2); associatedNotesDesc.push(partner); }
-            } else { 
-                descendingTransposed.push((baseCents + rotationCents + 12000.0) % 1200.0); 
-                associatedNotesDesc.push(note); 
-            }
+                const partner = detourMap[note]; const partnerCents = customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner];
+                let p1 = (baseCents + rotationCents + 12000.0) % 1200.0; let p2 = (partnerCents + rotationCents + 12000.0) % 1200.0;
+                if (p1 < p2) { descendingTransposed.push(p1); associatedNotesDesc.push(note); } else { descendingTransposed.push(p2); associatedNotesDesc.push(partner); }
+            } else { descendingTransposed.push((baseCents + rotationCents + 12000.0) % 1200.0); associatedNotesDesc.push(note); }
         });
-        
         const setup = getCleanAscendingTransposed();
-        let combinedDesc = descendingTransposed.map((c, idx) => { 
-            let normalized = c; 
-            if (normalized < setup.tonic - 0.01) normalized += 1200.0; 
-            return { centsValue: normalized, noteName: associatedNotesDesc[idx] }; 
-        });
+        let combinedDesc = descendingTransposed.map((c, idx) => { let normalized = c; if (normalized < setup.tonic - 0.01) normalized += 1200.0; return { centsValue: normalized, noteName: associatedNotesDesc[idx] }; });
         combinedDesc.sort((a, b) => b.centsValue - a.centsValue);
-        
-        let cleanDescending = []; 
-        let cleanNotesOrderDesc = []; 
-        combinedDesc.forEach(item => { 
-            if (item.centsValue > setup.tonic + 0.01) { 
-                cleanDescending.push(item.centsValue); 
-                cleanNotesOrderDesc.push(item.noteName); 
-            } 
-        });
-        
+        let cleanDescending = []; let cleanNotesOrderDesc = []; combinedDesc.forEach(item => { if (item.centsValue > setup.tonic + 0.01) { cleanDescending.push(item.centsValue); cleanNotesOrderDesc.push(item.noteName); } });
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
-        
-        // === isolated hardware sequencer step runner ===
         const noteDurationMs = 450; 
-        const durationSec = noteDurationMs / 1000.0;
-        
-        let currentStepIndex = 0;
-        let nextNoteHardwareTime = audioCtx.currentTime + 0.05;
+        let noteDelayOffset = 0;
 
-        function runSequencerStep() {
-            // Stop immediately if the user hit the Stop button or if we reach the end
-            if (!isScalePreviewRunning || currentStepIndex >= finalMelodyCentsPath.length) return;
-
-            const playCents = finalMelodyCentsPath[currentStepIndex];
+        finalMelodyCentsPath.forEach((playCents, idx) => {
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
-            const currentNoteName = finalNotesPath[currentStepIndex];
+            const currentNoteName = finalNotesPath[idx];
 
-            // 1. Build hardware sound nodes directly on the audio context timeline for this single step
-            const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(frequencyHz, nextNoteHardwareTime);
+            // 1. Schedule Note Start: Uses your native engine so circle graphics work perfectly
+            setTimeout(() => { 
+                startVoicePoly(0, frequencyHz, currentNoteName); 
+            }, noteDelayOffset);
 
-            gainNode.gain.setValueAtTime(0, nextNoteHardwareTime);
-            gainNode.gain.linearRampToValueAtTime(0.25, nextNoteHardwareTime + 0.05);
-            gainNode.gain.setValueAtTime(0.25, nextNoteHardwareTime + durationSec - 0.05);
-            gainNode.gain.linearRampToValueAtTime(0, nextNoteHardwareTime + durationSec);
+            // 2. FIX: Schedule Note End as a flat, independent timeout to prevent mobile throttling lag
+            setTimeout(() => { 
+                stopVoicePoly(0); 
+            }, noteDelayOffset + (noteDurationMs - 50));
 
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            osc.start(nextNoteHardwareTime);
-            osc.stop(nextNoteHardwareTime + durationSec);
-
-            // 2. Map visual highlight rings in sync with this single note event block
-            if (currentNoteName) {
-                currentlyPlayingNoteNames.add(currentNoteName);
-                requestAnimationFrame(updatePlot);
-                
-                setTimeout(() => {
-                    currentlyPlayingNoteNames.delete(currentNoteName);
-                    requestAnimationFrame(updatePlot);
-                }, noteDurationMs - 50);
-            }
-
-            // Move pointer forward and advance the absolute hardware time track
-            currentStepIndex++;
-            nextNoteHardwareTime += durationSec;
-
-            // 3. Queue up the next step only when the current one finishes executing
-            if (currentStepIndex < finalMelodyCentsPath.length) {
-                setTimeout(runSequencerStep, noteDurationMs);
-            }
-        }
-
-        // Initialize the first step of the chain instantly
-        runSequencerStep();
-    } // <--- This closing bracket ends your playScalePreview function
-
+            // Advance the timeline spacing cleanly for the next note slot
+            noteDelayOffset += noteDurationMs;
+        });
+    } // <--- This closing bracket ends the playScalePreview function
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
     const latchedKeyboardKeys = new Set();
