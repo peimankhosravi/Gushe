@@ -283,9 +283,9 @@
                 
 		<label class="toggle-container">
                 <input type="checkbox" id="keyboard-toggle" checked>
-                Keys 1-0
+                Number Keys (1-0)
                 <input type="checkbox" id="hold-toggle">
-                Hold Note
+                Hold (Backspace clears)
                 </label>
 
             </div>
@@ -891,44 +891,72 @@
         let cleanAscending = []; let cleanNotesOrder = []; combined.forEach(item => { if (cleanAscending.length === 0 || Math.abs(item.centsValue - cleanAscending[cleanAscending.length - 1]) > 0.01) { cleanAscending.push(item.centsValue); cleanNotesOrder.push(item.noteName); } });
         return { path: cleanAscending, notesOrder: cleanNotesOrder, tonic: targetTransposedTonic };
     }
-    function playScalePreview() {
-        initAudio(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-        const noteCentsMap = {}; noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
-        let scaleNotesList = [...primaryLoopNotes]; 
-        scaleNotesList = scaleNotesList.filter(note => !Object.values(detourMap).includes(note));
-        if (scaleNotesList.length === 0) return;
 
-        const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
-        let descendingTransposed = []; let associatedNotesDesc = [];
-        scaleNotesList.forEach(note => {
-            const baseCents = customPitches[note] !== undefined ? customPitches[note] : noteCentsMap[note];
-            if (detourMap[note]) {
-                const partner = detourMap[note]; const partnerCents = customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner];
-                let p1 = (baseCents + rotationCents + 12000.0) % 1200.0; let p2 = (partnerCents + rotationCents + 12000.0) % 1200.0;
-                if (p1 < p2) { descendingTransposed.push(p1); associatedNotesDesc.push(note); } else { descendingTransposed.push(p2); associatedNotesDesc.push(partner); }
-            } else { descendingTransposed.push((baseCents + rotationCents + 12000.0) % 1200.0); associatedNotesDesc.push(note); }
-        });
-        const setup = getCleanAscendingTransposed();
-        let combinedDesc = descendingTransposed.map((c, idx) => { let normalized = c; if (normalized < setup.tonic - 0.01) normalized += 1200.0; return { centsValue: normalized, noteName: associatedNotesDesc[idx] }; });
-        combinedDesc.sort((a, b) => b.centsValue - a.centsValue);
-        let cleanDescending = []; let cleanNotesOrderDesc = []; combinedDesc.forEach(item => { if (item.centsValue > setup.tonic + 0.01) { cleanDescending.push(item.centsValue); cleanNotesOrderDesc.push(item.noteName); } });
-        const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
-        const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
-        let noteDelayOffset = 0; const noteDurationMs = 450; 
+    function playScalePreview() {
+        if (!finalMelodyCentsPath || finalMelodyCentsPath.length === 0 || !audioCtx) return;
+
+        // Ensure the hardware context is fully active (clearing mobile sleep modes)
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        // 1. Establish a rock-solid hardware clock baseline point
+        // Adding a 50ms cushion gives mobile threads time to schedule notes smoothly
+        let nextNoteHardwareTime = audioCtx.currentTime + 0.05;
+        
+        const durationSeconds = (typeof noteDurationMs !== 'undefined' ? noteDurationMs : 400) / 1000.0;
+
         finalMelodyCentsPath.forEach((playCents, idx) => {
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
-            const currentNoteName = finalNotesPath[idx];
+            const currentNoteName = finalNotesPath ? finalNotesPath[idx] : null;
 
-            setTimeout(() => { 
-                // FIX: Pass the pristine unique index key string directly to the tracking map
-                startVoicePoly(0, frequencyHz, currentNoteName); 
-                setTimeout(() => { stopVoicePoly(0); }, noteDurationMs - 50); 
-            }, noteDelayOffset);
+            // 2. Schedule the audio nodes directly onto the hardware timeline
+            // This bypasses setTimeout entirely, making it immune to mobile CPU lag!
+            scheduleHardwareVoice(frequencyHz, nextNoteHardwareTime, durationSeconds, currentNoteName); 
             
-            noteDelayOffset += noteDurationMs;
+            // Advance the timeline anchor cleanly by the precise duration step
+            nextNoteHardwareTime += durationSeconds;
         });
-
     }
+
+    // === SEPARATE HELPER: Renders the precise audio envelope curves directly on the audio chip ===
+    function scheduleHardwareVoice(frequencyHz, startTime, durationSec, noteName) {
+        try {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(frequencyHz, startTime);
+
+            // Smoothly curve the volume on and off using absolute hardware timestamps
+            gainNode.gain.setValueAtTime(0, startTime);
+            gainNode.gain.linearRampToValueAtTime(0.2, startTime + 0.02); // Fade In
+            gainNode.gain.setValueAtTime(0.2, startTime + durationSec - 0.05);
+            gainNode.gain.linearRampToValueAtTime(0, startTime + durationSec); // Fade Out
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.start(startTime);
+            osc.stop(startTime + durationSec + 0.02);
+
+            // Hook the visual wheel highlight tracker to match the hardware execution clock
+            setTimeout(() => {
+                if (typeof currentlyPlayingNoteNames !== 'undefined' && noteName) {
+                    currentlyPlayingNoteNames.add(noteName);
+                    if (typeof updatePlot === 'function') updatePlot();
+                    
+                    setTimeout(() => {
+                        currentlyPlayingNoteNames.delete(noteName);
+                        if (typeof updatePlot === 'function') updatePlot();
+                    }, (durationSec * 1000) - 50);
+                }
+            }, (startTime - audioCtx.currentTime) * 1000);
+
+        } catch (err) {
+            console.error("Hardware scheduling glitch:", err);
+        }
+    }
+
+
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
     const latchedKeyboardKeys = new Set();
     function getDetourCentsForNote(note, noteCentsMap) { if (!detourMap[note]) return null; const partner = detourMap[note]; return customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner]; }
