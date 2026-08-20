@@ -1357,13 +1357,13 @@
         stopScaleBtn.addEventListener('click', () => {
             isScalePreviewRunning = false;
             
-            // Clear out active melody timeouts instantly
+            // Clear out your active melody timeouts instantly
             let highestTimeoutId = setTimeout(() => {}, 0);
             for (let i = highestTimeoutId; i >= 0; i--) {
                 clearTimeout(i);
             }
 
-            // Wipe active registries and canvas visual halos
+            // Wipe your active visual canvas halos and registries
             currentlyPlayingNoteNames.clear();
             stopVoicePoly("notehead_staff_touch_voice");
             
@@ -1373,7 +1373,7 @@
                 stopAllVoices();
             }
             
-            stopVoicePoly(0); // Instantly terminate active preview sound
+            stopVoicePoly(0); // Instantly terminate the active preview sound slot
             if (typeof updatePlot === 'function') updatePlot();
         });
     }
