@@ -386,18 +386,31 @@
         const osc = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(hz, audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.05);
+        
+        // FIX: Hardlock an absolute time baseline anchor to prevent mobile clock drift
+        const now = audioCtx.currentTime;
+        const safeAttackTime = now + 0.015; // 15ms lookahead buffer for mobile processors
+
+        osc.frequency.setValueAtTime(hz, now);
+        
+        // Explicitly lock the volume baseline at 0 right now
+        gainNode.gain.setValueAtTime(0, now);
+        // Smoothly curve up to 0.25 relative to our safe mobile lookahead window
+        gainNode.gain.linearRampToValueAtTime(0.25, safeAttackTime + 0.05);
+        
         osc.connect(gainNode);
         gainNode.connect(audioCtx.destination);
-        osc.start();
+        
+        // Explicitly pass the hardware start time anchor
+        osc.start(now);
+        
         activeVoicesMap.set(voiceId, { osc: osc, gainNode: gainNode, noteName: noteName });
         if (noteName) {
             currentlyPlayingNoteNames.add(noteName);
             requestAnimationFrame(updatePlot);
         }
     }
+
     function stopVoicePoly(voiceId) {
         if (activeVoicesMap.has(voiceId)) {
             const voice = activeVoicesMap.get(voiceId);
@@ -406,18 +419,18 @@
                 requestAnimationFrame(updatePlot);
             }
             try {
-                // FIX: Grab the current gain level instantly, lock it, and force a lookahead cushion 
-                // so the mobile hardware clock never outruns the linear release ramp
+                // FIX: Grab the current real gain value instantly, lock it to the current time,
+                // and give the mobile hardware a 15ms head-start to render the release ramp cleanly
                 const currentGainVal = voice.gainNode.gain.value;
-                const safeReleaseTime = audioCtx.currentTime + 0.01;
+                const mobileSafeReleaseTime = audioCtx.currentTime + 0.015;
                 
                 voice.gainNode.gain.setValueAtTime(currentGainVal, audioCtx.currentTime);
-                voice.gainNode.gain.linearRampToValueAtTime(0, safeReleaseTime + 0.04);
+                // Slide the volume smoothly down to zero over your preferred envelope cushion window (40ms)
+                voice.gainNode.gain.linearRampToValueAtTime(0, mobileSafeReleaseTime + 0.04);
                 
                 const targetOsc = voice.osc;
-                setTimeout(() => targetOsc.stop(), 65);
+                setTimeout(() => targetOsc.stop(), 70);
             } catch(e) {}
-
             activeVoicesMap.delete(voiceId);
         }
     }
