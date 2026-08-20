@@ -1003,7 +1003,8 @@
         }
 
         // Initialize the first step of the chain instantly
-        runSequencerStep();
+        // FIX: Introduce a 150ms buffer to let the mobile audio hardware wake up before the first note fires!
+        setTimeout(runSequencerStep, 150);
     }
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
