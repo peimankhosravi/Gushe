@@ -935,21 +935,28 @@
         let cleanDescending = []; let cleanNotesOrderDesc = []; combinedDesc.forEach(item => { if (item.centsValue > setup.tonic + 0.01) { cleanDescending.push(item.centsValue); cleanNotesOrderDesc.push(item.noteName); } });
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
-        let noteDelayOffset = 0; const noteDurationMs = 450; 
+        const noteDurationMs = 450; 
+        let noteDelayOffset = 0;
+
         finalMelodyCentsPath.forEach((playCents, idx) => {
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
+            // 1. Schedule Note Start: Uses your native engine so circle graphics work perfectly
             setTimeout(() => { 
-                // FIX: Pass the pristine unique index key string directly to the tracking map
                 startVoicePoly(0, frequencyHz, currentNoteName); 
-                setTimeout(() => { stopVoicePoly(0); }, noteDurationMs - 50); 
             }, noteDelayOffset);
-            
+
+            // 2. FIX: Schedule Note End as a flat, independent timeout to prevent mobile throttling lag
+            setTimeout(() => { 
+                stopVoicePoly(0); 
+            }, noteDelayOffset + (noteDurationMs - 50));
+
+            // Advance the timeline spacing cleanly for the next note slot
             noteDelayOffset += noteDurationMs;
         });
+    } // <--- This closing bracket ends the playScalePreview function
 
-    }
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
     const latchedKeyboardKeys = new Set();
     function getDetourCentsForNote(note, noteCentsMap) { if (!detourMap[note]) return null; const partner = detourMap[note]; return customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner]; }
