@@ -18,11 +18,12 @@
             min-height: 100vh; 
             box-sizing: border-box;
 
-	    /* UNIVERSAL TABLET UNFLASH FIX */
-	    -webkit-user-select: none;
-	    -moz-user-select: none;
-	    user-select: none;
-            outline: none !important;
+	    /* 👉 Change your old user-select line to look exactly like this: */
+	    -webkit-user-select: none; /* Safari, Chrome, and iOS viewports */
+	    -moz-user-select: none;    /* Firefox */
+	    -ms-user-select: none;     /* IE10+ and older mobile views */
+	    user-select: none;         /* Modern standard fallback */
+
         }
 
         #canvas { 
