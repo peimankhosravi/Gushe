@@ -9,7 +9,7 @@
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            background-color: grey; 
+            background-color: #7d7d7d; 
             margin: 10; 
             padding: 0px;
             display: flex; 
@@ -28,7 +28,7 @@
         }
 
         #canvas { 
-            background: white; 
+            background: #7d7d7d; 
             margin-top: 10px; 
             cursor: pointer; 
             display: block; 
@@ -37,6 +37,7 @@
             -webkit-user-select: none; /* Stops text selection popups on hold */
             user-select: none;
         }
+
         #controls { 
             margin-top: 0px; 
             max-width: 900px; 
@@ -717,17 +718,17 @@
         });
         masterNoteMatrix.forEach((node) => {
             const pt = staticCoords[node.name]; const lblPt = labelCoords[node.name];
-            let elementStyleColor = 'black'; 
+            let elementStyleColor = 'white'; 
             if (node.name.includes('sori')) {
-                elementStyleColor = 'red'; 
+                elementStyleColor = '#3f3f3f'; 
             } else if (node.name.includes('sharp')) {
-                elementStyleColor = 'brown'; 
+                elementStyleColor = 'black'; 
             } else if (node.name.includes('koron')) {
-                elementStyleColor = 'blue';
+                elementStyleColor = '#3f3f3f';
             } else if (node.name.includes('flat')) {
-                elementStyleColor = 'purple';
+                elementStyleColor = 'black';
             }
-            ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, 2 * Math.PI); ctx.fillStyle = elementStyleColor; ctx.fill();
+            ctx.beginPath(); ctx.arc(pt.x, pt.y, 8, 0, 2 * Math.PI); ctx.fillStyle = elementStyleColor; ctx.fill();
             ctx.fillStyle = elementStyleColor; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(node.txtLine1, lblPt.x, lblPt.y - 5); 
             ctx.fillText(node.txtLine2, lblPt.x, lblPt.y + 5); 
