@@ -922,7 +922,7 @@
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
         
-        const noteDurationMs = 450; 
+        const noteDurationMs = 600; 
         let noteDelayOffset = 0;
 
         finalMelodyCentsPath.forEach((playCents, idx) => {
@@ -934,9 +934,26 @@
                 if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
             }, noteDelayOffset);
 
-            // 2. Note Off Thread: Symmetrical flat delay ensures the sound cuts out cleanly
+            // 2. Note Off & Highlight Off Thread
             setTimeout(() => { 
-                if (isScalePreviewRunning) stopVoicePoly(0); 
+                if (!isScalePreviewRunning) return;
+
+                // Fire your file's native note-off routine cleanly
+                stopVoicePoly(0); 
+
+                // FIX: Check if this is the absolute final note in the path sequence array.
+                // If it is, toggle the button text back to "Play" seamlessly alongside the highlight thread!
+                const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
+                if (isFinalSequenceStep) {
+                    isScalePreviewRunning = false;
+                    if (previewToggleBtn) {
+   			previewToggleBtn.textContent = "Play";
+    			previewToggleBtn.style.backgroundColor = ""; 
+    			previewToggleBtn.style.borderColor = "";
+					   }
+
+                    requestAnimationFrame(updatePlot);
+                }
             }, noteDelayOffset + (noteDurationMs - 50));
 
             // Advance the timeline spacing cleanly for the next note slot position
