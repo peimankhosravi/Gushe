@@ -12,7 +12,7 @@ Number keys 1-0 play are mapped to the first 10 notes of the selected mode. Up t
 
 Interface
 
-The circle represents the pitch space. The Black, white and grey nodes represent the underlying gamut (tuning system). The nodes can be heard by clicking on them.
+The circle represents the pitch space. The colour coded nodes represent the underlying gamut (tuning system). Clicking on each node will sound the associated frequency.
 
 The step display at the top shows the first degree of the selected mode. Click on the arrows to rotate the scale within the pitch space to see different transpositional possibilities of each mode.
 
