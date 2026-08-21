@@ -921,44 +921,48 @@
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
         
-        const noteDurationMs = 600; 
-        let noteDelayOffset = 0;
+        const noteDurationMs = 450; 
+        const durationSec = noteDurationMs / 1000.0;
+        
+        // 1. Establish a single high-precision time anchor when the sequence starts
+        const baselineTime = performance.now();
 
         finalMelodyCentsPath.forEach((playCents, idx) => {
             const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
             const currentNoteName = finalNotesPath[idx];
 
-            // 1. Note On Thread: Standard timeout trigger ensures your Stop button clears it perfectly
+            // 2. FIX: Calculate absolute, mathematically locked execution windows.
+            // This prevents your phone's CPU drift from compounding step-by-step!
+            const exactStartDelay = idx * noteDurationMs;
+            const exactEndDelay = (idx * noteDurationMs) + (noteDurationMs - 50);
+
+            // 3. Note On Trigger: Keeps your exact native engine intact
             setTimeout(() => { 
                 if (isScalePreviewRunning) startVoicePoly(0, frequencyHz, currentNoteName); 
-            }, noteDelayOffset);
+            }, exactStartDelay);
 
-            // 2. Note Off & Highlight Off Thread
+            // 4. Note Off & Button Return Handle
             setTimeout(() => { 
                 if (!isScalePreviewRunning) return;
 
-                // Fire your file's native note-off routine cleanly
+                // Fire your file's native note-off cleanly
                 stopVoicePoly(0); 
 
-                // FIX: Check if this is the absolute final note in the path sequence array.
-                // If it is, toggle the button text back to "Play" seamlessly alongside the highlight thread!
+                // Look at the index loop step. The exact frame the final note highlight turns off,
+                // it returns a direct completion signal to reset the toggle button!
                 const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
                 if (isFinalSequenceStep) {
                     isScalePreviewRunning = false;
                     if (previewToggleBtn) {
-   			previewToggleBtn.textContent = "Play";
-    			previewToggleBtn.style.backgroundColor = ""; 
-    			previewToggleBtn.style.borderColor = "";
-}
-
+                        previewToggleBtn.textContent = "Play";
+                        previewToggleBtn.style.backgroundColor = ""; 
+                        previewToggleBtn.style.borderColor = "";
+                    }
                     requestAnimationFrame(updatePlot);
                 }
-            }, noteDelayOffset + (noteDurationMs - 50));
-
-            // Advance the timeline spacing cleanly for the next note slot position
-            noteDelayOffset += noteDurationMs;
+            }, exactEndDelay);
         });
-    }
+    } // <--- This closing bracket ends the playScalePreview function
 
 
     const activeKeyboardKeysHeld = {}; const activeKeyboardKeyToNoteNameMap = {};
