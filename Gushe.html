@@ -921,7 +921,7 @@
         const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
         const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
         
-        const noteDurationMs = 450; 
+        const noteDurationMs = 1000; 
         let noteDelayOffset = 0;
 
         finalMelodyCentsPath.forEach((playCents, idx) => {
