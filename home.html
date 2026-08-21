@@ -134,7 +134,7 @@
             height: 20px;
             font-weight: bold; 
             font-size: 12px; 
-            color: white; 
+            color: black; 
             cursor: pointer; 
             user-select: none;
         }
@@ -144,9 +144,9 @@
             display: inline-flex;
             align-items: center;
             background: #f7fafc; 
-            padding: 6px 6px; 
+            padding: 3px 3px; 
             border-radius: 6px; 
-            border: 3px solid #e2e8f0; 
+            border: 1px solid #e2e8f0; 
             margin-top: 30px;
             gap: 5px;
             width: fit-content;
@@ -280,10 +280,10 @@
             </div>
 
 	<div class="control-group" style="width: 100%; display: flex; justify-content: center; margin-bottom: 20px;">
-		<canvas id="canvas" width="700" height="650"></canvas>
+		<canvas id="canvas" width="700" height="630"></canvas>
 	</div>
 
-        <div class="control-group" style="background: #f7fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-top: 15px;">
+        <div class="control-group" style="background: #f7fafc; padding: 3px; border-radius: 6px; border: 1px solid #e2e8f0; margin-top: 15px;">
             <div style="display: flex; align-items: center; gap: 15px;">
                 <input type="range" id="master-cents-slider" min="-200" max="200" value="0" step="1" style="flex-grow: 1; accent-color: #00cea6; cursor: pointer;">
                 <div style="font-family: monospace; font-size: 12px; font-weight: bold; background: white; padding: 4px 10px; border-radius: 4px; border: 1px solid #cbd5e0; min-width: 50px; text-align: center; color: #2d3748;">
@@ -581,15 +581,15 @@
         masterNoteMatrix.forEach((node) => {
             const angle = (-90 + (node.calculatedCents / 1200.0) * 360) * Math.PI / 180.0;
             staticCoords[node.name] = { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) };
-            let labelRadius = radius + 45;
+            let labelRadius = radius + 42;
             if (node.name === "F sharp" || node.name === "F sori") {
-                labelRadius = radius + 45;
+                labelRadius = radius + 40;
             } else if (node.name === "C koron" || node.name === "C sori") {
                 labelRadius = radius + 30;
             } else if (node.name === "G" || node.name === "G koron" || node.name === "G flat") {
                 labelRadius = radius + 30; 
             } else if (node.name === "C" || node.name === "D flat" || node.name === "B" || node.name === "B koron" || node.name === "D" || node.name === "D koron") {
-                labelRadius = radius + 30;
+                labelRadius = radius + 25;
             }
             labelCoords[node.name] = { x: centerX + labelRadius * Math.cos(angle), y: centerY + labelRadius * Math.sin(angle) };
         });
@@ -727,7 +727,7 @@
                 elementStyleColor = 'black';
             }
             ctx.beginPath(); ctx.arc(pt.x, pt.y, 8, 0, 2 * Math.PI); ctx.fillStyle = elementStyleColor; ctx.fill();
-            ctx.fillStyle = elementStyleColor; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = elementStyleColor; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(node.txtLine1, lblPt.x, lblPt.y - 10); 
             ctx.fillText(node.txtLine2, lblPt.x, lblPt.y + 5); 
             let cX = rotCoords[node.name].x, cY = rotCoords[node.name].y;
