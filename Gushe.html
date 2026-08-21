@@ -134,13 +134,11 @@
             gap: 0px; 
             height: 20px;
             font-weight: bold; 
-            font-size: 8px; 
+            font-size: 12px; 
             color: white; 
             cursor: pointer; 
             user-select: none;
         }
-
-
 
         /* Simple Tablet Parameter Stepper Box Layout */
         .stepper-container {
@@ -159,9 +157,9 @@
             background: #ffffff;
             border: 1px solid #cbd5e0;
             border-radius: 4px;
-            width: 10px;
+            width: 30px;
             height: 20px;
-            font-size: 14px;
+            font-size: 20px;
             font-weight: bold;
             color: #2d3748;
             cursor: pointer;
@@ -233,7 +231,6 @@
                 <div class="stepper-display-box" id="stepper-note-display">C (0¢)</div>
                 <button class="stepper-btn" id="stepper-next-btn" type="button">&gt;</button>
                 
-
                 </div>
 
 
@@ -282,10 +279,9 @@
                 <button class="btn-file-load" id="preview-scale-btn" style="min-width: 80px; transition: all 0.1s ease;">Play</button>
                 
 		<label class="toggle-container">
-                <input type="checkbox" id="keyboard-toggle" checked>
-                Number Keys
+
                 <input type="checkbox" id="hold-toggle">
-                Hold Note
+                Hold Notes
                 </label>
 
             </div>
@@ -455,7 +451,6 @@
     const textEntry = document.getElementById('text-entry');
     const presetSelect = document.getElementById('preset-select');
     const fileInput = document.getElementById('file-input');
-    const keyboardToggle = document.getElementById('keyboard-toggle');
     const centerX = 350, centerY = 330, radius = 270;
     let nodeClickAreas = []; 
     let currentRotationOffset = 0; 
@@ -976,7 +971,7 @@
             return; // Stops execution here so it doesn't run note math
         }
 
-        if (!keyboardToggle.checked || document.activeElement === textEntry) return;
+	if (document.activeElement === textEntry) return;
         const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
 
         const targetIndex = codeMap[e.code]; if (targetIndex === undefined) return;
@@ -1425,13 +1420,36 @@
         updatePlot();
     }
 
-    // Attach manipulation triggers optimized for quick tablet fingertip taps
-    stepperPrevBtn.addEventListener('click', () => updateStepperAlignment(-1));
-    stepperNextBtn.addEventListener('click', () => updateStepperAlignment(1));
+    	// Attach manipulation triggers optimized for quick tablet fingertip taps
+    	stepperPrevBtn.addEventListener('click', () => updateStepperAlignment(-1));
+    	stepperNextBtn.addEventListener('click', () => updateStepperAlignment(1));
 
 
+
+    // === KEYBOARD SHORTCUT CONTROLLER ===
+    window.addEventListener('keydown', (event) => {
+        // Check if the user pressed the Spacebar (modern 'Code' or older 'Key' value)
+        if (event.code === 'Space' || event.key === ' ') {
+            
+            // Safety Check: Prevent the shortcut from firing if the user is typing inside an input box
+            const activeElement = document.activeElement;
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+                return;
+            }
+            
+            // Prevent the browser's default spacebar action (scrolling the page down)
+            event.preventDefault();
+            
+            // Programmatically trigger a click on your working preview button!
+            if (previewToggleBtn) {
+                previewToggleBtn.click();
+            }
+        }
+    });
 
 	updatePlot();
+
+
 </script>
 </body>
 </html>
