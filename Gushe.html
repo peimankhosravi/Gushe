@@ -936,16 +936,7 @@
                 // FIX: Check if this is the absolute final note in the path sequence array.
                 // If it is, toggle the button text back to "Play" seamlessly alongside the highlight thread!
                 const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
-                if (isFinalSequenceStep) {
-                    isScalePreviewRunning = false;
-                    if (previewToggleBtn) {
-   			previewToggleBtn.textContent = "Play";
-    			previewToggleBtn.style.backgroundColor = ""; 
-   			previewToggleBtn.style.borderColor = "";
-		     }
 
-                    requestAnimationFrame(updatePlot);
-                }
             }, noteDelayOffset + (noteDurationMs - 50));
 
             // Advance the timeline spacing cleanly for the next note slot position
