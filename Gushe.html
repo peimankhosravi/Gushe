@@ -435,28 +435,6 @@
                 
             } catch(e) {}
             
-            // 5. ISOLATED FALLBACK: This timer ONLY handles the interface text buttons style hooks 
-            // for the scale preview loop. It no longer controls or touches your real physical audio voice lifespans!
-            setTimeout(() => {
-                if (typeof isScalePreviewRunning !== 'undefined' && isScalePreviewRunning) {
-                    
-                    // FIX: Filter for your unique lookahead preview keys to prevent mobile map data collisions
-                    const activePreviewVoices = Array.from(activeVoicesMap.keys()).filter(id => 
-                        id === 0 || id === "0" || (typeof id === 'string' && id.startsWith("preview_scale_"))
-                    );
-                    
-                    if (activePreviewVoices.length === 0) {
-                        isScalePreviewRunning = false;
-                        const toggleBtn = document.getElementById('preview-scale-btn');
-                        if (toggleBtn) {
-                            toggleBtn.textContent = "Play";
-                            toggleBtn.style.backgroundColor = "";
-                            toggleBtn.style.borderColor = "";
-                            requestAnimationFrame(updatePlot);
-                        }
-                    }
-                }
-            }, 60);
 
             activeVoicesMap.delete(voiceId);
         }
