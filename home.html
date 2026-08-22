@@ -946,51 +946,38 @@ function playScalePreview() {
         } 
     });
     
-    const fallbackTonicString = parsedFirstTonicName || (scaleNotesList.length > 0 ? scaleNotesList : "C");
+    const fallbackTonicString = parsedFirstTonicName || (scaleNotesList.length > 0 ? scaleNotesList[0] : "C");
     
     const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
     const finalNotesPath = [...setup.notesOrder, fallbackTonicString, ...cleanNotesOrderDesc, fallbackTonicString];
     
-    const noteDurationMs = 600;
-    const noteDurationSec = noteDurationMs / 1000.0;
+    const noteDurationSec = 0.5; // Locked sustain duration
+    const tempoSpacingSec = 0.6; // Perfect temporal rhythm spacing
     
     const startTimeStamp = audioCtx.currentTime;
-
     activePreviewTimeouts = [];
     activePreviewOscillators = [];
 
+    // HARDWARE AUDIO TIMELINE SCHEDULER (Fixes Tablet/Mobile stuttering)
     finalMelodyCentsPath.forEach((playCents, idx) => {
         const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
         const currentNoteName = finalNotesPath[idx];
         
-        const noteStartSeconds = idx * noteDurationSec;
+        const noteStartSeconds = idx * tempoSpacingSec;
         const noteEndSeconds = noteStartSeconds + noteDurationSec;
+        const targetTimelineTriggerTime = startTimeStamp + noteStartSeconds;
+        const targetTimelineStopTime = startTimeStamp + noteEndSeconds;
         
         const uniquePreviewVoiceId = "preview_voice_" + idx;
 
-        // 1. HARDWARE AUDIO TIMELINE
+        // 1. Queue visual highlighting states perfectly synchronized with the hardware clock
         const tIdStart = setTimeout(() => {
             if (!isScalePreviewRunning) return;
-            
             startVoicePoly(uniquePreviewVoiceId, frequencyHz, currentNoteName);
-            
-            const voice = activeVoicesMap.get(uniquePreviewVoiceId);
-            if (voice) {
-                if (!activePreviewOscillators.includes(voice.osc)) {
-                    activePreviewOscillators.push(voice.osc);
-                }
-
-                const releaseDuration = 0.05; 
-                voice.gainNode.gain.cancelScheduledValues(startTimeStamp + noteEndSeconds - 0.01);
-                voice.gainNode.gain.setValueAtTime(0.25, startTimeStamp + noteEndSeconds - releaseDuration);
-                voice.gainNode.gain.linearRampToValueAtTime(0.0, startTimeStamp + noteEndSeconds);
-                voice.osc.stop(startTimeStamp + noteEndSeconds);
-            }
         }, noteStartSeconds * 1000);
-        
         activePreviewTimeouts.push(tIdStart);
 
-        // 2. VISUAL LAYOUT HIGHLIGHT CLEANUP
+        // 2. Queue visual teardown states
         const tIdEnd = setTimeout(() => { 
             stopVoicePoly(uniquePreviewVoiceId);
 
@@ -1007,7 +994,6 @@ function playScalePreview() {
                 requestAnimationFrame(updatePlot);
             }
         }, noteEndSeconds * 1000);
-
         activePreviewTimeouts.push(tIdEnd);
     });
 }
@@ -1026,13 +1012,21 @@ window.addEventListener('keydown', (e) => {
     }
 
     if (document.activeElement === textEntry) return;
-    const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
 
+    // A. Handle Spacebar Global Play/Stop Trigger Shortcut cleanly
+    if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        if (previewToggleBtn) {
+            previewToggleBtn.click();
+        }
+        return;
+    }
+
+    const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
     const targetIndex = codeMap[e.code]; 
     if (targetIndex === undefined) return;
     const holdActive = document.getElementById('hold-toggle').checked;
 
-    // Unique voice ID tied permanently to the physical key slot
     const keyboardVoiceId = "kbd_voice_" + e.code;
 
     if (holdActive) {
@@ -1040,6 +1034,7 @@ window.addEventListener('keydown', (e) => {
             latchedKeyboardKeys.delete(e.code);
             stopVoicePoly(keyboardVoiceId); 
             delete activeKeyboardKeyToNoteNameMap[e.code];
+            requestAnimationFrame(updatePlot);
             return;
         }
         latchedKeyboardKeys.add(e.code);
@@ -1058,10 +1053,7 @@ window.addEventListener('keydown', (e) => {
     noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
     const isUpperCasedAction = e.shiftKey || e.getModifierState('CapsLock'); 
 
-    // 1. Filter out detour map notes as you did before
     let filteredNotesList = [...primaryLoopNotes].filter(note => !Object.values(detourMap).includes(note));
-    
-    // 2. THE FIX: Remove duplicate note names right here
     filteredNotesList = [...new Set(filteredNotesList)];
     
     filteredNotesList.sort((a, b) => {
@@ -1069,55 +1061,41 @@ window.addEventListener('keydown', (e) => {
         const rawB = customPitches[b] !== undefined ? customPitches[b] : noteCentsMap[b];
         let normA = (rawA + rotationCents + 12000.0) % 1200.0;
         let normB = (rawB + rotationCents + 12000.0) % 1200.0;
-        
         if (normA < setup.tonic - 0.01) normA += 1200.0;
         if (normB < setup.tonic - 0.01) normB += 1200.0;
-        
-        // 3. THE FIX: Handle floating-point precision issues to guarantee clear separation
-        if (Math.abs(normA - normB) < 0.05) {
-            return 0; 
-        }
-        
+        if (Math.abs(normA - normB) < 0.05) return 0; 
         return normA - normB;
     });
 
-// 1. Define the exact index position where the octave note should sit
-const octaveIndex = filteredNotesList.length;
+    const octaveIndex = filteredNotesList.length;
 
-if (targetIndex < filteredNotesList.length) {
-    const noteNameAtKey = filteredNotesList[targetIndex];
-    
-    if (isUpperCasedAction && detourMap[noteNameAtKey]) {
-        noteNamePlayed = detourMap[noteNameAtKey];
-    } else {
-        noteNamePlayed = noteNameAtKey;
+    if (targetIndex < filteredNotesList.length) {
+        const noteNameAtKey = filteredNotesList[targetIndex];
+        noteNamePlayed = (isUpperCasedAction && detourMap[noteNameAtKey]) ? detourMap[noteNameAtKey] : noteNameAtKey;
+
+        let baseCents = 0;
+        if (customPitches[noteNamePlayed] !== undefined) {
+            baseCents = customPitches[noteNamePlayed];
+        } else {
+            const baseMatrixName = String(noteNamePlayed).split("__")[0];
+            const targetNoteIdx = noteNames.indexOf(baseMatrixName);
+            baseCents = targetNoteIdx >= 0 ? cents[targetNoteIdx] : 0;
+        }
+
+        targetCents = (baseCents + rotationCents + 12000.0) % 1200.0;
+        if (targetCents < setup.tonic - 0.01) targetCents += 1200.0;
+
+    } else if (targetIndex === octaveIndex) { 
+        targetCents = setup.tonic + 1200.0; 
+        noteNamePlayed = parsedFirstTonicName || (filteredNotesList.length > 0 ? filteredNotesList[0] : "C"); 
     }
-
-    let baseCents = 0;
-    if (customPitches[noteNamePlayed] !== undefined) {
-        baseCents = customPitches[noteNamePlayed];
-    } else {
-        const baseMatrixName = String(noteNamePlayed).split("__")[0];
-        const targetNoteIdx = noteNames.indexOf(baseMatrixName);
-        baseCents = targetNoteIdx >= 0 ? cents[targetNoteIdx] : 0;
-    }
-
-    targetCents = (baseCents + rotationCents + 12000.0) % 1200.0;
-    if (targetCents < setup.tonic - 0.01) targetCents += 1200.0;
-
-// 2. This block now only executes for the exact next key following the scale list length
-} else if (targetIndex === octaveIndex) { 
-    targetCents = setup.tonic + 1200.0; 
-    noteNamePlayed = parsedFirstTonicName || (filteredNotesList.length > 0 ? filteredNotesList[0] : "C"); 
-}
-
 
     if (targetCents !== null) { 
         e.preventDefault(); 
         const frequencyHz = masterBaseHz * Math.pow(2.0, targetCents / 1200.0); 
         activeKeyboardKeyToNoteNameMap[e.code] = noteNamePlayed; 
-        
         startVoicePoly(keyboardVoiceId, frequencyHz, noteNamePlayed); 
+        requestAnimationFrame(updatePlot);
     }
 });
 
@@ -1518,26 +1496,6 @@ if (previewToggleBtn) {
 
 
 
-    // === KEYBOARD SHORTCUT CONTROLLER ===
-    window.addEventListener('keydown', (event) => {
-        // Check if the user pressed the Spacebar (modern 'Code' or older 'Key' value)
-        if (event.code === 'Space' || event.key === ' ') {
-            
-            // Safety Check: Prevent the shortcut from firing if the user is typing inside an input box
-            const activeElement = document.activeElement;
-            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
-                return;
-            }
-            
-            // Prevent the browser's default spacebar action (scrolling the page down)
-            event.preventDefault();
-            
-            // Programmatically trigger a click on your working preview button!
-            if (previewToggleBtn) {
-                previewToggleBtn.click();
-            }
-        }
-    });
 
 	updatePlot();
 
