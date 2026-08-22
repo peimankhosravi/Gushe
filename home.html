@@ -1058,15 +1058,26 @@ window.addEventListener('keydown', (e) => {
     noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
     const isUpperCasedAction = e.shiftKey || e.getModifierState('CapsLock'); 
 
+    // 1. Filter out detour map notes as you did before
     let filteredNotesList = [...primaryLoopNotes].filter(note => !Object.values(detourMap).includes(note));
+    
+    // 2. THE FIX: Remove duplicate note names right here
+    filteredNotesList = [...new Set(filteredNotesList)];
     
     filteredNotesList.sort((a, b) => {
         const rawA = customPitches[a] !== undefined ? customPitches[a] : noteCentsMap[a];
         const rawB = customPitches[b] !== undefined ? customPitches[b] : noteCentsMap[b];
         let normA = (rawA + rotationCents + 12000.0) % 1200.0;
         let normB = (rawB + rotationCents + 12000.0) % 1200.0;
+        
         if (normA < setup.tonic - 0.01) normA += 1200.0;
         if (normB < setup.tonic - 0.01) normB += 1200.0;
+        
+        // 3. THE FIX: Handle floating-point precision issues to guarantee clear separation
+        if (Math.abs(normA - normB) < 0.05) {
+            return 0; 
+        }
+        
         return normA - normB;
     });
 
