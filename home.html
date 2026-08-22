@@ -158,7 +158,7 @@
             border-radius: 4px;
             width: 40px;
             height: 20px;
-            font-size: 20px;
+            font-size: 14px;
             font-weight: bold;
             color: #2d3748;
             cursor: pointer;
@@ -228,7 +228,6 @@
                 <button class="stepper-btn" id="stepper-prev-btn" type="button">&lt;</button>               
 		<div class="stepper-display-box" id="stepper-note-display">C (0¢)</div>
                 <button class="stepper-btn" id="stepper-next-btn" type="button">&gt;</button>
-     		</div>
             </div>
         </div>
 
@@ -297,6 +296,11 @@
 
 
 <script>
+
+    // Keep track of which background node index is currently targeted by our step selection
+    let currentStepperIndex = 0;
+
+
     const masterNoteMatrix = [
         { name: "C", ratio: "1/1", type: "dynamic" },
         { name: "C sori", ratio: "33/32", type: "dynamic" },
@@ -376,7 +380,7 @@
         }
 
         stopVoicePoly(voiceId);
-        if (activeVoicesMap.size >= 4) {
+        if (activeVoicesMap.size >= 8) {
             const oldestVoiceKey = activeVoicesMap.keys().next().value;
             stopVoicePoly(oldestVoiceKey);
         }
@@ -581,7 +585,7 @@
         masterNoteMatrix.forEach((node) => {
             const angle = (-90 + (node.calculatedCents / 1200.0) * 360) * Math.PI / 180.0;
             staticCoords[node.name] = { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) };
-            let labelRadius = radius + 42;
+            let labelRadius = radius + 45;
             if (node.name === "F sharp" || node.name === "F sori") {
                 labelRadius = radius + 40;
             } else if (node.name === "C koron" || node.name === "C sori") {
@@ -589,12 +593,13 @@
             } else if (node.name === "G" || node.name === "G koron" || node.name === "G flat") {
                 labelRadius = radius + 30; 
             } else if (node.name === "C" || node.name === "D flat" || node.name === "B" || node.name === "B koron" || node.name === "D" || node.name === "D koron") {
-                labelRadius = radius + 25;
+                labelRadius = radius + 30;
             }
             labelCoords[node.name] = { x: centerX + labelRadius * Math.cos(angle), y: centerY + labelRadius * Math.sin(angle) };
         });
         const rawText = textEntry.value;
-        let modeName = "", notesString = rawText;
+        let modeName = ""; 
+	let notesString = rawText;
         if (rawText.includes("=")) {
             const eqPos = rawText.indexOf("=");
             modeName = rawText.substring(0, eqPos).trim(); 
@@ -894,49 +899,96 @@
         return { path: cleanAscending, notesOrder: cleanNotesOrder, tonic: targetTransposedTonic };
     }
 
-
 function playScalePreview() {
-    initAudio(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    const noteCentsMap = {}; noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
+    initAudio(); 
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const noteCentsMap = {}; 
+    noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
+    
     let scaleNotesList = [...primaryLoopNotes]; 
     scaleNotesList = scaleNotesList.filter(note => !Object.values(detourMap).includes(note));
     if (scaleNotesList.length === 0) return;
 
     const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
-    let descendingTransposed = []; let associatedNotesDesc = [];
+    let descendingTransposed = []; 
+    let associatedNotesDesc = [];
+    
     scaleNotesList.forEach(note => {
         const baseCents = customPitches[note] !== undefined ? customPitches[note] : noteCentsMap[note];
         if (detourMap[note]) {
-            const partner = detourMap[note]; const partnerCents = customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner];
-            let p1 = (baseCents + rotationCents + 12000.0) % 1200.0; let p2 = (partnerCents + rotationCents + 12000.0) % 1200.0;
+            const partner = detourMap[note]; 
+            const partnerCents = customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner];
+            let p1 = (baseCents + rotationCents + 12000.0) % 1200.0; 
+            let p2 = (partnerCents + rotationCents + 12000.0) % 1200.0;
             if (p1 < p2) { descendingTransposed.push(p1); associatedNotesDesc.push(note); } else { descendingTransposed.push(p2); associatedNotesDesc.push(partner); }
         } else { descendingTransposed.push((baseCents + rotationCents + 12000.0) % 1200.0); associatedNotesDesc.push(note); }
     });
-    const setup = getCleanAscendingTransposed();
-    let combinedDesc = descendingTransposed.map((c, idx) => { let normalized = c; if (normalized < setup.tonic - 0.01) normalized += 1200.0; return { centsValue: normalized, noteName: associatedNotesDesc[idx] }; });
-    combinedDesc.sort((a, b) => b.centsValue - a.centsValue);
-    let cleanDescending = []; let cleanNotesOrderDesc = []; combinedDesc.forEach(item => { if (item.centsValue > setup.tonic + 0.01) { cleanDescending.push(item.centsValue); cleanNotesOrderDesc.push(item.noteName); } });
-    const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
-    const finalNotesPath = [...setup.notesOrder, parsedFirstTonicName || scaleNotesList, ...cleanNotesOrderDesc, parsedFirstTonicName || scaleNotesList];
     
-    const noteDurationMs = 600; 
-    let noteDelayOffset = 0;
+    const setup = getCleanAscendingTransposed();
+    let combinedDesc = descendingTransposed.map((c, idx) => { 
+        let normalized = c; 
+        if (normalized < setup.tonic - 0.01) normalized += 1200.0; 
+        return { centsValue: normalized, noteName: associatedNotesDesc[idx] }; 
+    });
+    combinedDesc.sort((a, b) => b.centsValue - a.centsValue);
+    
+    let cleanDescending = []; 
+    let cleanNotesOrderDesc = []; 
+    combinedDesc.forEach(item => { 
+        if (item.centsValue > setup.tonic + 0.01) { 
+            cleanDescending.push(item.centsValue); 
+            cleanNotesOrderDesc.push(item.noteName); 
+        } 
+    });
+    
+    const fallbackTonicString = parsedFirstTonicName || (scaleNotesList.length > 0 ? scaleNotesList : "C");
+    
+    const finalMelodyCentsPath = [...setup.path, setup.tonic + 1200.0, ...cleanDescending, setup.tonic];
+    const finalNotesPath = [...setup.notesOrder, fallbackTonicString, ...cleanNotesOrderDesc, fallbackTonicString];
+    
+    const noteDurationMs = 600;
+    const noteDurationSec = noteDurationMs / 1000.0;
+    
+    const startTimeStamp = audioCtx.currentTime;
+
+    activePreviewTimeouts = [];
+    activePreviewOscillators = [];
 
     finalMelodyCentsPath.forEach((playCents, idx) => {
         const frequencyHz = masterBaseHz * Math.pow(2.0, playCents / 1200.0); 
         const currentNoteName = finalNotesPath[idx];
+        
+        const noteStartSeconds = idx * noteDurationSec;
+        const noteEndSeconds = noteStartSeconds + noteDurationSec;
+        
+        const uniquePreviewVoiceId = "preview_voice_" + idx;
 
-        // 1. Note On Thread: Uses "preview_voice" instead of 0 to stop C key conflicts
-        setTimeout(() => { 
-            if (isScalePreviewRunning) startVoicePoly("preview_voice", frequencyHz, currentNoteName); 
-        }, noteDelayOffset);
-
-        // 2. Note Off & Highlight Off Thread
-        setTimeout(() => { 
+        // 1. HARDWARE AUDIO TIMELINE
+        const tIdStart = setTimeout(() => {
             if (!isScalePreviewRunning) return;
+            
+            startVoicePoly(uniquePreviewVoiceId, frequencyHz, currentNoteName);
+            
+            const voice = activeVoicesMap.get(uniquePreviewVoiceId);
+            if (voice) {
+                if (!activePreviewOscillators.includes(voice.osc)) {
+                    activePreviewOscillators.push(voice.osc);
+                }
 
-            // Silences the dedicated preview voice register
-            stopVoicePoly("preview_voice"); 
+                const releaseDuration = 0.05; 
+                voice.gainNode.gain.cancelScheduledValues(startTimeStamp + noteEndSeconds - 0.01);
+                voice.gainNode.gain.setValueAtTime(0.25, startTimeStamp + noteEndSeconds - releaseDuration);
+                voice.gainNode.gain.linearRampToValueAtTime(0.0, startTimeStamp + noteEndSeconds);
+                voice.osc.stop(startTimeStamp + noteEndSeconds);
+            }
+        }, noteStartSeconds * 1000);
+        
+        activePreviewTimeouts.push(tIdStart);
+
+        // 2. VISUAL LAYOUT HIGHLIGHT CLEANUP
+        const tIdEnd = setTimeout(() => { 
+            stopVoicePoly(uniquePreviewVoiceId);
 
             const isFinalSequenceStep = (idx === finalMelodyCentsPath.length - 1);
             if (isFinalSequenceStep) {
@@ -946,11 +998,13 @@ function playScalePreview() {
                     previewToggleBtn.style.backgroundColor = ""; 
                     previewToggleBtn.style.borderColor = "";
                 }
+                activePreviewTimeouts = [];
+                activePreviewOscillators = [];
                 requestAnimationFrame(updatePlot);
             }
-        }, noteDelayOffset + (noteDurationMs - 50));
+        }, noteEndSeconds * 1000);
 
-        noteDelayOffset += noteDurationMs;
+        activePreviewTimeouts.push(tIdEnd);
     });
 }
 
@@ -959,112 +1013,107 @@ function playScalePreview() {
     const latchedKeyboardKeys = new Set();
     function getDetourCentsForNote(note, noteCentsMap) { if (!detourMap[note]) return null; const partner = detourMap[note]; return customPitches[partner] !== undefined ? customPitches[partner] : noteCentsMap[partner]; }
 
-    window.addEventListener('keydown', (e) => {
-        // Trigger the clear function on Backspace if not actively typing text
-        if (e.code === 'Backspace' && document.activeElement !== textEntry) {
-            e.preventDefault();
-            clearAllHeldNotes();
-            return; // Stops execution here so it doesn't run note math
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Backspace' && document.activeElement !== textEntry) {
+        e.preventDefault();
+        clearAllHeldNotes();
+        return; 
+    }
+
+    if (document.activeElement === textEntry) return;
+    const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
+
+    const targetIndex = codeMap[e.code]; 
+    if (targetIndex === undefined) return;
+    const holdActive = document.getElementById('hold-toggle').checked;
+
+    // Unique voice ID tied permanently to the physical key slot
+    const keyboardVoiceId = "kbd_voice_" + e.code;
+
+    if (holdActive) {
+        if (latchedKeyboardKeys.has(e.code)) {
+            latchedKeyboardKeys.delete(e.code);
+            stopVoicePoly(keyboardVoiceId); 
+            delete activeKeyboardKeyToNoteNameMap[e.code];
+            return;
         }
+        latchedKeyboardKeys.add(e.code);
+    } else {
+        if (activeKeyboardKeysHeld[e.code]) return; 
+        activeKeyboardKeysHeld[e.code] = true;
+    }
 
-	if (document.activeElement === textEntry) return;
-        const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
+    const setup = getCleanAscendingTransposed(); 
+    if (!setup || !setup.path || setup.path.length === 0) return;
+    
+    let targetCents = null; 
+    let noteNamePlayed = null; 
+    const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
+    const noteCentsMap = {}; 
+    noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
+    const isUpperCasedAction = e.shiftKey || e.getModifierState('CapsLock'); 
 
-        const targetIndex = codeMap[e.code]; if (targetIndex === undefined) return;
-        const holdActive = document.getElementById('hold-toggle').checked;
+    let filteredNotesList = [...primaryLoopNotes].filter(note => !Object.values(detourMap).includes(note));
+    
+    filteredNotesList.sort((a, b) => {
+        const rawA = customPitches[a] !== undefined ? customPitches[a] : noteCentsMap[a];
+        const rawB = customPitches[b] !== undefined ? customPitches[b] : noteCentsMap[b];
+        let normA = (rawA + rotationCents + 12000.0) % 1200.0;
+        let normB = (rawB + rotationCents + 12000.0) % 1200.0;
+        if (normA < setup.tonic - 0.01) normA += 1200.0;
+        if (normB < setup.tonic - 0.01) normB += 1200.0;
+        return normA - normB;
+    });
 
-        if (holdActive) {
-            if (latchedKeyboardKeys.has(e.code)) {
-                latchedKeyboardKeys.delete(e.code);
-                stopVoicePoly(targetIndex);
-                delete activeKeyboardKeyToNoteNameMap[e.code];
-                return;
-            }
-            latchedKeyboardKeys.add(e.code);
-        } else {
-            if (activeKeyboardKeysHeld[e.code]) return; 
-            activeKeyboardKeysHeld[e.code] = true;
-        }
-
-        const setup = getCleanAscendingTransposed(); if (!setup || !setup.path || setup.path.length === 0) return;
-        let targetCents = null; let noteNamePlayed = null; const rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
-        const noteCentsMap = {}; noteNames.forEach((name, i) => { noteCentsMap[name] = cents[i]; });
-        const isUpperCasedAction = e.shiftKey || e.getModifierState('CapsLock'); 
-
-        let filteredNotesList = [...primaryLoopNotes].filter(note => !Object.values(detourMap).includes(note));
+    const octaveIndex = Math.min(filteredNotesList.length, 9);
+    if (targetIndex < filteredNotesList.length) {
+        const noteNameAtKey = filteredNotesList[targetIndex];
         
-        filteredNotesList.sort((a, b) => {
-            const rawA = customPitches[a] !== undefined ? customPitches[a] : noteCentsMap[a];
-            const rawB = customPitches[b] !== undefined ? customPitches[b] : noteCentsMap[b];
-            let normA = (rawA + rotationCents + 12000.0) % 1200.0;
-            let normB = (rawB + rotationCents + 12000.0) % 1200.0;
-            if (normA < setup.tonic - 0.01) normA += 1200.0;
-            if (normB < setup.tonic - 0.01) normB += 1200.0;
-            return normA - normB;
-        });
-
-        const octaveIndex = Math.min(filteredNotesList.length, 9);
-        if (targetIndex < filteredNotesList.length) {
-            const noteNameAtKey = filteredNotesList[targetIndex];
-            
-            if (isUpperCasedAction && detourMap[noteNameAtKey]) {
-                noteNamePlayed = detourMap[noteNameAtKey];
-            } else {
-                noteNamePlayed = noteNameAtKey;
-            }
-
-            // Extract the core text token format structure from your text input field
-            const rawText = textEntry.value;
-            let notesString = rawText.includes("=") ? rawText.split("=")[1] : rawText;
-            let isCustomScale = notesString.includes("/") || /[0-9]/.test(notesString);
-
-            let baseCents = 0;
-            if (customPitches[noteNamePlayed] !== undefined) {
-                baseCents = customPitches[noteNamePlayed];
-            } else {
-                const baseMatrixName = noteNamePlayed.split("__")[0];
-                const targetNoteIdx = noteNames.indexOf(baseMatrixName);
-                baseCents = targetNoteIdx >= 0 ? cents[targetNoteIdx] : 0;
-            }
-
-            if (isCustomScale) {
-                // Play absolute, un-transposed intervals matching your floating green lines
-                targetCents = baseCents;
-            } else {
-                // Traditional named notes scale: Apply visual graph wheel rotation offsets
-                targetCents = (baseCents + rotationCents + 12000.0) % 1200.0;
-                if (targetCents < setup.tonic - 0.01) targetCents += 1200.0;
-            }
-
-        } else if (targetIndex === octaveIndex) { 
-
-            targetCents = setup.tonic + 1200.0; 
-            noteNamePlayed = parsedFirstTonicName || (filteredNotesList.length > 0 ? filteredNotesList[0] : "C"); 
+        if (isUpperCasedAction && detourMap[noteNameAtKey]) {
+            noteNamePlayed = detourMap[noteNameAtKey];
+        } else {
+            noteNamePlayed = noteNameAtKey;
         }
 
-        if (targetCents !== null) { 
-            e.preventDefault(); 
-            const frequencyHz = masterBaseHz * Math.pow(2.0, targetCents / 1200.0); 
-            activeKeyboardKeyToNoteNameMap[e.code] = noteNamePlayed; 
-            
-            // FIX: Pass the full unique token string so the visual engine can isolate overlapping scale degrees
-            startVoicePoly(targetIndex, frequencyHz, noteNamePlayed); 
+        let baseCents = 0;
+        if (customPitches[noteNamePlayed] !== undefined) {
+            baseCents = customPitches[noteNamePlayed];
+        } else {
+            const baseMatrixName = String(noteNamePlayed).split("__")[0];
+            const targetNoteIdx = noteNames.indexOf(baseMatrixName);
+            baseCents = targetNoteIdx >= 0 ? cents[targetNoteIdx] : 0;
         }
 
+        targetCents = (baseCents + rotationCents + 12000.0) % 1200.0;
+        if (targetCents < setup.tonic - 0.01) targetCents += 1200.0;
 
-    });
-        window.addEventListener('keyup', (e) => {
-        const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
+    } else if (targetIndex === octaveIndex) { 
+        targetCents = setup.tonic + 1200.0; 
+        noteNamePlayed = parsedFirstTonicName || (filteredNotesList.length > 0 ? filteredNotesList[0] : "C"); 
+    }
 
-        if (codeMap[e.code] !== undefined) { 
-            activeKeyboardKeysHeld[e.code] = false; 
-            const holdActive = document.getElementById('hold-toggle').checked;
-            if (!holdActive && !latchedKeyboardKeys.has(e.code)) {
-                stopVoicePoly(codeMap[e.code]); 
-                delete activeKeyboardKeyToNoteNameMap[e.code]; 
-            }
+    if (targetCents !== null) { 
+        e.preventDefault(); 
+        const frequencyHz = masterBaseHz * Math.pow(2.0, targetCents / 1200.0); 
+        activeKeyboardKeyToNoteNameMap[e.code] = noteNamePlayed; 
+        
+        startVoicePoly(keyboardVoiceId, frequencyHz, noteNamePlayed); 
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    const codeMap = { 'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4, 'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9 };
+
+    if (codeMap[e.code] !== undefined) { 
+        activeKeyboardKeysHeld[e.code] = false; 
+        const holdActive = document.getElementById('hold-toggle').checked;
+        if (!holdActive && !latchedKeyboardKeys.has(e.code)) {
+            stopVoicePoly("kbd_voice_" + e.code); 
+            delete activeKeyboardKeyToNoteNameMap[e.code]; 
         }
-    });
+    }
+});
 
     function handlePointerDown(e) {
         // Prevent default touch behaviors (like viewport scrolling/zooming) while playing
@@ -1072,7 +1121,7 @@ function playScalePreview() {
         
         const rect = canvas.getBoundingClientRect(); 
         
-        // FIX: Scale raw touch pixels to perfectly match your 700x650 internal canvas resolution
+        // Scale raw touch pixels to perfectly match your 700x630 internal canvas resolution
         const mx = (e.clientX - rect.left) * (canvas.width / rect.width); 
         const my = (e.clientY - rect.top) * (canvas.height / rect.height); 
         
@@ -1133,160 +1182,169 @@ function playScalePreview() {
         } 
     }
 
-    async function exportToScala() {
-        // 1. Identify the structural format of your input scale string tokens
-        const rawText = textEntry.value;
-        let notesString = rawText.includes("=") ? rawText.split("=")[1] : rawText;
-        const items = notesString.split(",").map(s => s.trim()).filter(Boolean);
+async function exportToScala() {
+    // 1. Identify the structural format of your input scale string tokens
+    const rawText = textEntry.value;
+    let notesString = rawText.includes("=") ? rawText.split("=")[1] : rawText;
+    const items = notesString.split(",").map(s => s.trim()).filter(Boolean);
+    
+    let isCentsScale = false;
+    let isRatioScale = false;
+    let containsTraditionalNotes = false; // NEW: Explicitly track if named pitch nodes are present
+
+    items.forEach(item => {
+        let cleanedItem = item.replace(/\(.*?\)/g, "").replace(/-.*/g, "").trim();
+        const isFraction = cleanedItem.includes("/");
+        const isNumericValue = !isNaN(parseFloat(cleanedItem)) && isFinite(cleanedItem);
         
-        let isCentsScale = false;
-        let isRatioScale = false;
-        items.forEach(item => {
-            let cleanedItem = item.replace(/\(.*?\)/g, "").replace(/-.*/g, "").trim();
-            const isFraction = cleanedItem.includes("/");
-            const isNumericValue = !isNaN(parseFloat(cleanedItem)) && isFinite(cleanedItem);
-            
-            if (isFraction) isRatioScale = true;
-            else if (isNumericValue) isCentsScale = true;
-        });
-        const isTraditionalScale = !isCentsScale && !isRatioScale;
-
-        // Condition: Only apply geometric alignment checks if it's a traditional scale
-        if (isTraditionalScale && !checkCurrentAlignmentLock()) { 
-            alert("Export Aborted: One or more geometric line intersections sit more than 3 cents away from a valid pitch node."); 
-            return; 
-        }
-
-        // 2. Conditionally handle rotation math based on your scale definition types
-        let rotationCents = 0;
-        if (isTraditionalScale) {
-            rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
-        }
-
-        let activeScalePitches = [];
-        
-        activeVisualScaleNotes.forEach(uniqueKey => {
-            // Retrieve the baseline cent height of this item step
-            let nativeCents = customPitches[uniqueKey];
-            if (nativeCents === undefined) {
-                const baseName = uniqueKey.split("__")[0];
-                const baseIdx = noteNames.indexOf(baseName);
-                if (baseIdx >= 0) nativeCents = cents[baseIdx];
-            }
-
-            if (nativeCents !== undefined) {
-                // Compute the operational absolute position (Rotation applies ONLY if traditional scale)
-                const targetCentsValue = (nativeCents + rotationCents + 12000.0) % 1200.0;
-                
-                // Match this coordinate spot to the absolute closest physical background matrix pin node
-                let closestMatrixIdx = 0;
-                let minDiff = Infinity;
-                for (let n = 0; n < cents.length; n++) {
-                    let diff = Math.abs(cents[n] - targetCentsValue);
-                    if (diff > 600) diff = 1200 - diff;
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        closestMatrixIdx = n;
-                    }
-                }
-
-                activeScalePitches.push({
-                    name: noteNames[closestMatrixIdx],
-                    cents: cents[closestMatrixIdx],
-                    ratio: ratios[closestMatrixIdx],
-                    originalCents: nativeCents,
-                    key: uniqueKey
-                });
-            }
-        });
-
-        if (activeScalePitches.length === 0) return;
-
-        // 3. FLAWLESS CHRONOLOGICAL SHUFFLE: Order notes strictly from C (0 cents) up across the grid
-        if (isTraditionalScale) {
-            activeScalePitches.sort((a, b) => a.cents - b.cents);
+        if (isFraction) {
+            isRatioScale = true;
+        } else if (isNumericValue) {
+            isCentsScale = true;
         } else {
-            activeScalePitches.sort((a, b) => a.originalCents - b.originalCents);
+            // If it's not a pure number or fraction, it contains a traditional named grid pin
+            containsTraditionalNotes = true;
+        }
+    });
+
+    // CRITICAL SECURITY FIX: If the scale relies on named structural notes at all, 
+    // it MUST pass the geometric alignment lock test, even if mixed with raw numbers/fractions.
+    if (containsTraditionalNotes && !checkCurrentAlignmentLock()) { 
+        alert("Export Aborted: One or more geometric line intersections sit more than 3 cents away from a valid pitch node."); 
+        return; 
+    }
+
+    // Determine fallback routing mechanics
+    const isTraditionalScale = !isCentsScale && !isRatioScale;
+
+    // 2. Conditionally handle rotation math based on your scale definition types
+    let rotationCents = 0;
+    if (containsTraditionalNotes) { // FIXED: Keep rotation synchronized for any layout using background pins
+        rotationCents = parseFloat(currentRotationOffset) * (1200.0 / 360.0);
+    }
+
+    let activeScalePitches = [];
+    
+    activeVisualScaleNotes.forEach(uniqueKey => {
+        // Retrieve the baseline cent height of this item step
+        let nativeCents = customPitches[uniqueKey];
+        if (nativeCents === undefined) {
+            const baseName = uniqueKey.split("__")[0];
+            const baseIdx = noteNames.indexOf(baseName);
+            if (baseIdx >= 0) nativeCents = cents[baseIdx];
         }
 
-        // 4. Extract the true baseline fundamental ("C") as the implicit zero reference path
-        const rootTonic = activeScalePitches.shift();
-        const baselineCents = isTraditionalScale ? rootTonic.cents : rootTonic.originalCents;
-
-        // 5. Calculate relative interval steps for all subsequent active notes
-        const linesData = [];
-        activeScalePitches.forEach((item) => {
-            let currentCents = isTraditionalScale ? item.cents : item.originalCents;
-            let relativeCents = currentCents - baselineCents;
-            if (relativeCents < -0.01) relativeCents += 1200.0;
+        if (nativeCents !== undefined) {
+            // Compute the operational absolute position
+            const targetCentsValue = (nativeCents + rotationCents + 12000.0) % 1200.0;
             
-            if (relativeCents > 0.01) {
-                let valueString = "";
-                
-                if (isCentsScale) {
-                    // Untransposed Cents scales print relative calculated decimal steps exactly as typed
-                    valueString = relativeCents.toFixed(5);
-                } else if (isTraditionalScale) {
-                    // Rotated traditional scales look up the true static fraction of the resting pin node
-                    valueString = item.ratio;
-                } else {
-                    // Untransposed Ratio Scales: Pull the direct textual fraction token string from your raw input box
-                    const parts = item.key.split("__");
-                    let matchedOriginalToken = "";
-                    if (parts.length > 1) {
-                        const uniqueSuffix = parts[1];
-                        let targetIdx = -1;
-                        if (uniqueSuffix.includes("_p")) targetIdx = parseInt(uniqueSuffix.split("_p")[0]);
-                        else if (uniqueSuffix.includes("_d")) targetIdx = parseInt(uniqueSuffix.split("_d")[0]);
-                        else targetIdx = parseInt(uniqueSuffix);
-                        
-                        if (!isNaN(targetIdx) && items[targetIdx]) {
-                            let tok = items[targetIdx];
-                            if (tok.includes("-")) tok = uniqueSuffix.includes("_d") ? tok.split("-")[1] : tok.split("-")[0];
-                            if (tok.includes("(")) tok = tok.split("(")[0];
-                            matchedOriginalToken = tok.trim();
-                        }
-                    }
-                    valueString = matchedOriginalToken.includes("/") ? matchedOriginalToken : item.ratio;
+            // Match this coordinate spot to the absolute closest physical background matrix pin node
+            let closestMatrixIdx = 0;
+            let minDiff = Infinity;
+            for (let n = 0; n < cents.length; n++) {
+                let diff = Math.abs(cents[n] - targetCentsValue);
+                if (diff > 600) diff = 1200 - diff;
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestMatrixIdx = n;
                 }
-
-                linesData.push({
-                    name: item.name,
-                    valueString: valueString
-                });
             }
-        });
 
-        // 6. Build the dynamic Scala file structure matching your exact scale layout
-        let sclContent = `! ${computedScaleName}.scl\n`;
-        sclContent += `Custom Scale Exporter - Dynamic Hybrid Format Engine\n`;
-        sclContent += `${linesData.length + 1}\n`;
-        sclContent += `!\n`;
+            activeScalePitches.push({
+                name: noteNames[closestMatrixIdx],
+                cents: cents[closestMatrixIdx],
+                ratio: ratios[closestMatrixIdx],
+                originalCents: nativeCents,
+                key: uniqueKey
+            });
+        }
+    });
 
-        linesData.forEach(item => {
-            sclContent += `${item.valueString}\n`;
-        });
-        sclContent += `2/1\n`; // Append standard 2/1 octave step to complete the scale cycle wrap-around
-        sclContent += `!\n`;
+    if (activeScalePitches.length === 0) return;
 
-        // 7. NOTE_NAMES: Follows the pristine graphic sorted order and leaves out the octave label
-        let namesRow = `! @ABL NOTE_NAMES "${rootTonic.name}"`;
-        linesData.forEach(item => {
-            namesRow += ` "${item.name}"`;
-        });
-        sclContent += `${namesRow}\n`;
-        sclContent += `! @ABL REFERENCE_PITCH 0 0 ${masterBaseHz.toFixed(2)}\n`;
-
-        // 8. Stream the file download directly to your directory
-        const blob = new Blob([sclContent], { type: 'text/plain;charset=utf-8' }); 
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob); 
-        link.download = `${computedScaleName}.scl`; 
-        document.body.appendChild(link); 
-        link.click(); 
-        document.body.removeChild(link); 
-        URL.revokeObjectURL(link.href);
+    // 3. Order notes chronologically across the tuning circle structure
+    if (isTraditionalScale) {
+        activeScalePitches.sort((a, b) => a.cents - b.cents);
+    } else {
+        activeScalePitches.sort((a, b) => a.originalCents - b.originalCents);
     }
+
+    // 4. Extract the true baseline fundamental as the implicit zero reference path
+    const rootTonic = activeScalePitches.shift();
+    const baselineCents = isTraditionalScale ? rootTonic.cents : rootTonic.originalCents;
+
+    // 5. Calculate relative interval steps for all subsequent active notes
+    const linesData = [];
+    activeScalePitches.forEach((item) => {
+        let currentCents = isTraditionalScale ? item.cents : item.originalCents;
+        let relativeCents = currentCents - baselineCents;
+        if (relativeCents < -0.01) relativeCents += 1200.0;
+        
+        if (relativeCents > 0.01) {
+            let valueString = "";
+            
+            if (isCentsScale) {
+                valueString = relativeCents.toFixed(5);
+            } else if (isTraditionalScale) {
+                valueString = item.ratio;
+            } else {
+                // Hybrid layout handling: extract original typed fraction strings dynamically
+                const parts = item.key.split("__");
+                let matchedOriginalToken = "";
+                if (parts.length > 1) {
+                    const uniqueSuffix = parts[1];
+                    let targetIdx = -1;
+                    if (uniqueSuffix.includes("_p")) targetIdx = parseInt(uniqueSuffix.split("_p")[0]);
+                    else if (uniqueSuffix.includes("_d")) targetIdx = parseInt(uniqueSuffix.split("_d")[0]);
+                    else targetIdx = parseInt(uniqueSuffix);
+                    
+                    if (!isNaN(targetIdx) && items[targetIdx]) {
+                        let tok = items[targetIdx];
+                        if (tok.includes("-")) tok = uniqueSuffix.includes("_d") ? tok.split("-")[1] : tok.split("-")[0];
+                        if (tok.includes("(")) tok = tok.split("(")[0];
+                        matchedOriginalToken = tok.trim();
+                    }
+                }
+                valueString = matchedOriginalToken.includes("/") ? matchedOriginalToken : item.ratio;
+            }
+
+            linesData.push({
+                name: item.name,
+                valueString: valueString
+            });
+        }
+    });
+
+    // 6. Build the dynamic Scala file structure matching your exact scale layout
+    let sclContent = `! ${computedScaleName}.scl\n`;
+    sclContent += `Custom Scale Exporter - Dynamic Hybrid Format Engine\n`;
+    sclContent += `${linesData.length + 1}\n`;
+    sclContent += `!\n`;
+
+    linesData.forEach(item => {
+        sclContent += `${item.valueString}\n`;
+    });
+    sclContent += `2/1\n`; 
+    sclContent += `!\n`;
+
+    // 7. NOTE_NAMES mapping configuration line
+    let namesRow = `! @ABL NOTE_NAMES "${rootTonic.name}"`;
+    linesData.forEach(item => {
+        namesRow += ` "${item.name}"`;
+    });
+    sclContent += `${namesRow}\n`;
+    sclContent += `! @ABL REFERENCE_PITCH 0 0 ${masterBaseHz.toFixed(2)}\n`;
+
+    // 8. Stream the file download directly to your directory
+    const blob = new Blob([sclContent], { type: 'text/plain;charset=utf-8' }); 
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob); 
+    link.download = `${computedScaleName}.scl`; 
+    document.body.appendChild(link); 
+    link.click(); 
+    document.body.removeChild(link); 
+    URL.revokeObjectURL(link.href);
+}
 
 
 
@@ -1327,49 +1385,75 @@ function playScalePreview() {
     // === UNIFIED PLAY / STOP MULTI-TOGGLE CONTROLLER ===
     const previewToggleBtn = document.getElementById('preview-scale-btn');
     let isScalePreviewRunning = false;
+    // NEW: Precise execution trackers for the preview timeline engine
+    let activePreviewTimeouts = [];
+    let activePreviewOscillators = [];
 
-    if (previewToggleBtn) {
-        previewToggleBtn.addEventListener('click', () => {
-            if (isScalePreviewRunning) {
-                // ACTION: EMERGENCY AUDIO STOP COMMAND
-                isScalePreviewRunning = false;
-                
-                // Explicitly silence the visual notehead staff voice node
-                stopVoicePoly("notehead_staff_touch_voice");
-                
-                // Terminate global voice registers and active audio mapping arrays
-                if (typeof clearAllHeldNotes === 'function') {
-                    clearAllHeldNotes();
-                } else if (typeof stopAllVoices === 'function') {
-                    stopAllVoices();
-                }
-                
-                // Clear any running browser timeouts to freeze the melody loop instantly
-                let highestTimeoutId = setTimeout(() => {}, 0);
-                for (let i = highestTimeoutId; i >= 0; i--) {
-                    clearTimeout(i);
-                }
+if (previewToggleBtn) {
+    previewToggleBtn.addEventListener('click', () => {
+        if (isScalePreviewRunning) {
+            // ACTION: INITIATE GRACEFUL STOP SEQUENCE
+            isScalePreviewRunning = false;
+            
+            // Clear timeline intervals immediately so no NEW notes can trigger
+            activePreviewTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+            activePreviewTimeouts = [];
 
-                // Reset button appearance back to the standard green playable layout
-                previewToggleBtn.textContent = "Play";
-                previewToggleBtn.style.backgroundColor = ""; 
-                previewToggleBtn.style.borderColor = "";
-                
-                if (typeof updatePlot === 'function') updatePlot();
-            } else {
-                // ACTION: START SCALE PLAYBACK LOOP
-                isScalePreviewRunning = true;
-                previewToggleBtn.textContent = "Stop";
-                previewToggleBtn.style.backgroundColor = "#ff4d4d"; // Switch to alert red layout
-                previewToggleBtn.style.borderColor = "#ff3333";
+            const audioStopContext = (typeof audioCtx !== 'undefined') ? audioCtx : null;
+            const currentAudioTime = audioStopContext ? audioStopContext.currentTime : 0;
+            const fadeWindowSeconds = 0.05; // 50ms smooth ramp duration to stop clicks
 
-                // Execute your core sequential melody preview routine
-                if (typeof playScalePreview === 'function') {
-                    playScalePreview();
+            // 1. Trigger audio fade out on all active preview voices
+            for (let [key, voice] of activeVoicesMap.entries()) {
+                if (typeof key === 'string' && key.startsWith("preview_voice_")) {
+                    if (voice && voice.gainNode && audioStopContext) {
+                        try {
+                            // Cancel future scheduled volume points and fade to 0 instantly
+                            voice.gainNode.gain.cancelScheduledValues(currentAudioTime);
+                            voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, currentAudioTime);
+                            voice.gainNode.gain.linearRampToValueAtTime(0.0, currentAudioTime + fadeWindowSeconds);
+                        } catch(e) {}
+                    }
                 }
             }
-        });
-    }
+
+            // 2. Wait for the 50ms fade window to finish before cutting power to the oscillators
+            setTimeout(() => {
+                // Kill the hardware nodes completely
+                activePreviewOscillators.forEach(osc => {
+                    try { osc.stop(); } catch(e) {}
+                });
+                activePreviewOscillators = [];
+
+                // Clear visual highlights and clean the voice map tracking layout
+                for (let key of activeVoicesMap.keys()) {
+                    if (typeof key === 'string' && key.startsWith("preview_voice_")) {
+                        stopVoicePoly(key);
+                    }
+                }
+
+                if (typeof updatePlot === 'function') updatePlot();
+            }, fadeWindowSeconds * 1000);
+
+            // Reset button layout appearance immediately
+            previewToggleBtn.textContent = "Play";
+            previewToggleBtn.style.backgroundColor = ""; 
+            previewToggleBtn.style.borderColor = "";
+            
+        } else {
+            // ACTION: START SCALE PLAYBACK LOOP
+            isScalePreviewRunning = true;
+            previewToggleBtn.textContent = "Stop";
+            previewToggleBtn.style.backgroundColor = "#ff4d4d"; 
+            previewToggleBtn.style.borderColor = "#ff3333";
+
+            if (typeof playScalePreview === 'function') {
+                playScalePreview();
+            }
+        }
+    });
+}
+
 
 
 
@@ -1387,8 +1471,6 @@ function playScalePreview() {
     const stepperNextBtn = document.getElementById('stepper-next-btn');
     const stepperNoteDisplay = document.getElementById('stepper-note-display');
 
-    // Keep track of which background node index is currently targeted by our step selection
-    let currentStepperIndex = 0;
 
     function updateStepperAlignment(indexChange) {
         // Move selection index forward or backward, wrapping around cleanly across our 21 master nodes
