@@ -299,6 +299,9 @@
 
     // Keep track of which background node index is currently targeted by our step selection
     let currentStepperIndex = 0;
+    // Tracks which note name is tied to each active finger pointer ID
+    const activeTouchNotesMap = new Map();
+
 
 
     const masterNoteMatrix = [
@@ -892,7 +895,8 @@
                 if (p1 > p2) { ascendingTransposed.push(p1); associatedNotes.push(note); } else { ascendingTransposed.push(p2); associatedNotes.push(partner); }
             } else { ascendingTransposed.push((baseCents + rotationCents + 12000.0) % 1200.0); associatedNotes.push(note); }
         });
-        const initialTonicNote = parsedFirstTonicName || scaleNotesList; const baseTonicCents = customPitches[initialTonicNote] !== undefined ? customPitches[initialTonicNote] : noteCentsMap[initialTonicNote]; const targetTransposedTonic = (baseTonicCents + rotationCents + 12000.0) % 1200.0;
+        const initialTonicNote = parsedFirstTonicName || (scaleNotesList.length > 0 ? scaleNotesList[0] : "C");
+        const baseTonicCents = customPitches[initialTonicNote] !== undefined ? customPitches[initialTonicNote] : noteCentsMap[initialTonicNote]; const targetTransposedTonic = (baseTonicCents + rotationCents + 12000.0) % 1200.0;
         let combined = ascendingTransposed.map((c, idx) => { let normalized = c; if (normalized < targetTransposedTonic - 0.01) normalized += 1200.0; return { centsValue: normalized, noteName: associatedNotes[idx] }; });
         combined.sort((a, b) => a.centsValue - b.centsValue);
         let cleanAscending = []; let cleanNotesOrder = []; combined.forEach(item => { if (cleanAscending.length === 0 || Math.abs(item.centsValue - cleanAscending[cleanAscending.length - 1]) > 0.01) { cleanAscending.push(item.centsValue); cleanNotesOrder.push(item.noteName); } });
@@ -1066,32 +1070,36 @@ window.addEventListener('keydown', (e) => {
         return normA - normB;
     });
 
-    const octaveIndex = Math.min(filteredNotesList.length, 9);
-    if (targetIndex < filteredNotesList.length) {
-        const noteNameAtKey = filteredNotesList[targetIndex];
-        
-        if (isUpperCasedAction && detourMap[noteNameAtKey]) {
-            noteNamePlayed = detourMap[noteNameAtKey];
-        } else {
-            noteNamePlayed = noteNameAtKey;
-        }
+// 1. Define the exact index position where the octave note should sit
+const octaveIndex = filteredNotesList.length;
 
-        let baseCents = 0;
-        if (customPitches[noteNamePlayed] !== undefined) {
-            baseCents = customPitches[noteNamePlayed];
-        } else {
-            const baseMatrixName = String(noteNamePlayed).split("__")[0];
-            const targetNoteIdx = noteNames.indexOf(baseMatrixName);
-            baseCents = targetNoteIdx >= 0 ? cents[targetNoteIdx] : 0;
-        }
-
-        targetCents = (baseCents + rotationCents + 12000.0) % 1200.0;
-        if (targetCents < setup.tonic - 0.01) targetCents += 1200.0;
-
-    } else if (targetIndex === octaveIndex) { 
-        targetCents = setup.tonic + 1200.0; 
-        noteNamePlayed = parsedFirstTonicName || (filteredNotesList.length > 0 ? filteredNotesList[0] : "C"); 
+if (targetIndex < filteredNotesList.length) {
+    const noteNameAtKey = filteredNotesList[targetIndex];
+    
+    if (isUpperCasedAction && detourMap[noteNameAtKey]) {
+        noteNamePlayed = detourMap[noteNameAtKey];
+    } else {
+        noteNamePlayed = noteNameAtKey;
     }
+
+    let baseCents = 0;
+    if (customPitches[noteNamePlayed] !== undefined) {
+        baseCents = customPitches[noteNamePlayed];
+    } else {
+        const baseMatrixName = String(noteNamePlayed).split("__")[0];
+        const targetNoteIdx = noteNames.indexOf(baseMatrixName);
+        baseCents = targetNoteIdx >= 0 ? cents[targetNoteIdx] : 0;
+    }
+
+    targetCents = (baseCents + rotationCents + 12000.0) % 1200.0;
+    if (targetCents < setup.tonic - 0.01) targetCents += 1200.0;
+
+// 2. This block now only executes for the exact next key following the scale list length
+} else if (targetIndex === octaveIndex) { 
+    targetCents = setup.tonic + 1200.0; 
+    noteNamePlayed = parsedFirstTonicName || (filteredNotesList.length > 0 ? filteredNotesList[0] : "C"); 
+}
+
 
     if (targetCents !== null) { 
         e.preventDefault(); 
@@ -1115,72 +1123,67 @@ window.addEventListener('keyup', (e) => {
     }
 });
 
-    function handlePointerDown(e) {
-        // Prevent default touch behaviors (like viewport scrolling/zooming) while playing
-        if (e.pointerType === 'touch') canvas.setPointerCapture(e.pointerId);
-        
-        const rect = canvas.getBoundingClientRect(); 
-        
-        // Scale raw touch pixels to perfectly match your 700x630 internal canvas resolution
-        const mx = (e.clientX - rect.left) * (canvas.width / rect.width); 
-        const my = (e.clientY - rect.top) * (canvas.height / rect.height); 
-        
-        let soundNodeTriggered = false;
-        
-        for (let area of nodeClickAreas) { 
-            const dist = Math.hypot(mx - area.x, my - area.y); 
+function handlePointerDown(e) {
+    if (e.pointerType === 'touch') canvas.setPointerCapture(e.pointerId);
+    
+    const rect = canvas.getBoundingClientRect(); 
+    const mx = (e.clientX - rect.left) * (canvas.width / rect.width); 
+    const my = (e.clientY - rect.top) * (canvas.height / rect.height); 
+    
+    for (let area of nodeClickAreas) { 
+        const dist = Math.hypot(mx - area.x, my - area.y); 
 
-            if (dist <= area.radius) { 
-                const noteInstance = masterNoteMatrix.find(n => n.name === area.name);
-                const slashPos = noteInstance.ratio.indexOf("/");
-                const num = Number(noteInstance.ratio.substring(0, slashPos));
-                const den = Number(noteInstance.ratio.substring(slashPos + 1));
-                const baseCentsValue = 1200.0 * Math.log2(num / den);
-                const nonTransposedHz = 261.63 * Math.pow(2.0, baseCentsValue / 1200.0);
-                
-                const holdActive = document.getElementById('hold-toggle').checked;
-                // Create a distinct note-specific ID so it can be latched independently of individual fingertip contact indices
+        if (dist <= area.radius) { 
+            const noteInstance = masterNoteMatrix.find(n => n.name === area.name);
+            const slashPos = noteInstance.ratio.indexOf("/");
+            const num = Number(noteInstance.ratio.substring(0, slashPos));
+            const den = Number(noteInstance.ratio.substring(slashPos + 1));
+            const baseCentsValue = 1200.0 * Math.log2(num / den);
+            const nonTransposedHz = 261.63 * Math.pow(2.0, baseCentsValue / 1200.0);
+            
+            const holdActive = document.getElementById('hold-toggle').checked;
+            
+            if (holdActive) {
                 const touchVoiceId = "canvas_touch_" + area.name.replace(/\s+/g, '_');
-
-                if (holdActive) {
-                    // Toggle Note Latch behavior when Hold Notes is checked
-                    if (activeVoicesMap.has(touchVoiceId)) {
-                        stopVoicePoly(touchVoiceId);
-                    } else {
-                        startVoicePoly(touchVoiceId, nonTransposedHz, "static_grid_node__" + area.name); 
-                    }
+                if (activeVoicesMap.has(touchVoiceId)) {
+                    stopVoicePoly(touchVoiceId);
                 } else {
-                    // Standard momentary touch playback behavior
-                    startVoicePoly("canvas_touch_" + e.pointerId, nonTransposedHz, "static_grid_node__" + area.name); 
+                    startVoicePoly(touchVoiceId, nonTransposedHz, "static_grid_node__" + area.name); 
                 }
+            } else {
+                // CHANGE 1: Use a voice ID unique to BOTH the finger and the specific note name
+                const specificTouchVoiceId = `touch_${e.pointerId}_${area.name.replace(/\s+/g, '_')}`;
                 
-                soundNodeTriggered = true; 
-                break; 
+                // CHANGE 2: Record this specific voice ID to our tracker map
+                activeTouchNotesMap.set(e.pointerId, specificTouchVoiceId);
+                
+                startVoicePoly(specificTouchVoiceId, nonTransposedHz, "static_grid_node__" + area.name); 
             }
+            break; 
         }
     }
+}
 
 
-    function handlePointerMove(e) { return; }
 
-    function handlePointerUp(e) { 
-        if (e.pointerType === 'touch') {
-            try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
-        }
-        isDraggingScale = false; 
-        // Stop only the specific voice tied to this finger release, preserving other held nodes
+function handlePointerUp(e) { 
+    if (e.pointerType === 'touch') {
+        try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+    }
+    isDraggingScale = false; 
+
+    // CHANGE 3: Fetch the specific note-bound voice ID for this finger release
+    if (activeTouchNotesMap.has(e.pointerId)) {
+        const voiceIdToStop = activeTouchNotesMap.get(e.pointerId);
+        stopVoicePoly(voiceIdToStop);
+        activeTouchNotesMap.delete(e.pointerId); // Clean up tracking memory
+    } else {
+        // Fallback catch-all to prevent accidental stuck notes
         stopVoicePoly("canvas_touch_" + e.pointerId); 
     }
+}
 
-    function handleDoubleClick(e) { 
-        const rect = canvas.getBoundingClientRect(); 
-        const mx = e.clientX - rect.left; 
-        const my = e.clientY - rect.top; 
-        if (Math.hypot(mx - centerX, my - centerY) <= radius + 90) { 
-            currentRotationOffset = 0; 
-            updatePlot(); 
-        } 
-    }
+
 
 async function exportToScala() {
     // 1. Identify the structural format of your input scale string tokens
@@ -1460,7 +1463,7 @@ if (previewToggleBtn) {
 	presetSelect.addEventListener('change', () => { textEntry.value = presetSelect.value; updatePlot(); }); 
         canvas.addEventListener('pointerdown', handlePointerDown); 
  //       canvas.addEventListener('dblclick', handleDoubleClick); 
-        window.addEventListener('pointermove', handlePointerMove); 
+ //       window.addEventListener('pointermove', handlePointerMove); 
         window.addEventListener('pointerup', handlePointerUp);
         window.addEventListener('pointercancel', handlePointerUp); // Safe boundary drop handling
 	window.addEventListener('load', () => { setTimeout(updatePlot, 50); }); 
